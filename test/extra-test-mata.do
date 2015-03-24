@@ -34,6 +34,7 @@
 clear all
 pr drop _all
 discard
+set more off
 
 pwd
 clear all
@@ -99,6 +100,9 @@ foreach var of local variables {
 	replace `var' = resid
 	drop resid
 }
+
+// -------------------------------------------------------------------------------------------------
+
 
 regress `variables', nocons
 exit

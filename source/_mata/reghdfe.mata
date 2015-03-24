@@ -12,9 +12,11 @@
 // -------------------------------------------------------------
 local Varlist 		string scalar
 local Integer 		real scalar
-local VarByFE 		real colvector // Should be levels*1
-local Series		real colvector // Should be N*1
 local Matrix		real matrix
+local VarByFE 		real colvector // Should be levels*1
+local ManyVarByFE 	real matrix // Should be levels*1
+local Series		real colvector // Should be N*1
+local ManySeries	real matrix // Should be N*H
 local SharedData 	external struct FixedEffect vector
 
 mata:
@@ -174,8 +176,8 @@ void function prepare() {
 // (This function could benefit from a refactoring...)
 //
 
-`VarByFE' function transform(`VarByFE' indata, `Integer' g_from, `Integer' g_to) {
-	`VarByFE'		outdata
+`ManyVarByFE' function transform(`ManyVarByFE' indata, `Integer' g_from, `Integer' g_to) {
+	`ManyVarByFE'		outdata
 	`SharedData'	FEs
 	`Integer'		from_v, to_v // Whether the new or old FEs have cont. interactions
 	`Integer'		is_weighted
@@ -314,13 +316,14 @@ void function prepare() {
 }
 
 // -------------------------------------------------------------
-// MEAN_BY_GROUP: Take a N*1 vector and save the avg by FE into a levels*1 vector
+// MEAN_BY_GROUP: Take a N*H vector and save the avg by FE into a levels*H vector
 // -------------------------------------------------------------
-`VarByFE' function mean_by_group(`Series' indata, `Series' index, `VarByFE' sum_count, `VarByFE' counts_to, `Series' sorted_weight)
+`ManyVarByFE' function mean_by_group(`ManySeries' indata, `Series' index, `VarByFE' sum_count, 
+	`VarByFE' counts_to, `Series' sorted_weight)
 {
 	`Integer'	levels, i, j_lower, j_upper
-	`Series'	sorted_indata
-	`VarByFE'	outdata
+	`ManySeries'	sorted_indata
+	`ManyVarByFE'	outdata
 
 	assert(rows(indata)==rows(index))
 	levels = rows(sum_count)
@@ -342,10 +345,11 @@ void function prepare() {
 // -------------------------------------------------------------
 // REMEAN_BY_GROUP: Transform one mean by group into another (of a diff group)
 // -------------------------------------------------------------
-`VarByFE' function remean_by_group(`VarByFE' indata, `Series' index, `VarByFE' sum_count, `VarByFE' counts_to, `Series' sorted_weight)
+`ManyVarByFE' function remean_by_group(`ManyVarByFE' indata, `Series' index,
+	`VarByFE' sum_count, `VarByFE' counts_to, `Series' sorted_weight)
 {
 	`Integer'	levels_from, levels_to, i, j_lower, j_upper, obs
-	`Series'	se_indata
+	`ManySeries'	se_indata
 	`VarByFE'	outdata
 
 	obs = rows(index)
@@ -377,11 +381,12 @@ void function prepare() {
 // -------------------------------------------------------------
 // Returns block-column matrix with estimates by group; last estimate is the constant
 // (This function hasn't been optimized very much)
-`Matrix' function regress_by_group(`Series' y, `Matrix' x, `Series' index, 
+`Matrix' function regress_by_group(`ManySeries' y, `Matrix' x, `Series' index, 
 	`VarByFE' offset, `VarByFE' count, `Matrix' invxx, `Series' sorted_weight, group)
 {
 	`Integer'			N, K, levels, is_weighted, j_lower, j_upper, i
-	`Series'			predicted, tmp_y, tmp_w, sorted_y
+	`Series'			tmp_w
+	`ManySeries'		predicted, tmp_y, sorted_y
 	real colvector		b
 	external `Matrix'   betas
 	`Matrix'			tmp_x, tmp_invxx, sorted_x
@@ -482,9 +487,9 @@ void function make_residual(
 	`Integer'	eps, g, obs, stdev, levels, gstart, gextra, k // , _
 	`Integer'	acceleration_countdown, old_error, oldest_error, bad_loop, improvement
 	`Series' 	y, resid, ZZZ // ZZZ = sum of Zs except Z1
-	`VarByFE'	P1y
+	`ManyVarByFE'	P1y
 	string scalar		code, msg
-	pointer(`VarByFE') colvector	Deltas, oldDeltas, Zs, oldZs, Pytildes
+	pointer(`ManyVarByFE') colvector	Deltas, oldDeltas, Zs, oldZs, Pytildes
 	external `Matrix'	betas
 	
 	// Parse options
