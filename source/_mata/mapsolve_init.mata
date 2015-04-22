@@ -4,11 +4,9 @@ mata set matastrict on
 //  Parse absvars and initialize the almost empty MapProblem struct
 `Problem' function mapsolve_init() {
 	`Problem' 	S
-	// string vector				absvars
-	// string scalar				token
-	pointer(`FE') fe
-	`Integer'					g, G
-	`Integer'					G_expanded // Counts fixed slopes as independent categories
+	pointer(`FE') 	fe
+	`Integer'		g, G
+	`Integer'		G_expanded // Counts fixed slopes as independent categories
 
 	G = st_numscalar("r(G)")
 	S.G = G
@@ -26,9 +24,7 @@ mata set matastrict on
 		fe->target = st_global(sprintf("r(target%f)",g))
 		fe->levels = .
 	}
-	
 
-	//S.fixed_effects[G].levels
 	return(S)
 }
 
