@@ -19,8 +19,8 @@ mata set matastrict on
 		fe->varlabel = st_global(sprintf("r(varlabel%f)",g))
 		fe->num_slopes = st_numscalar(sprintf("r(num_slopes%f)",g))
 		fe->has_intercept = st_numscalar(sprintf("r(has_intercept%1.0f)",g))
-		fe->ivars = st_global(sprintf("r(ivars%f)",g))
-		fe->cvars = st_global(sprintf("r(cvars%f)",g))
+		fe->ivars = tokens(st_global( sprintf("r(ivars%f)",g) ))
+		fe->cvars = tokens(st_global( sprintf("r(cvars%f)",g) ))
 		fe->target = st_global(sprintf("r(target%f)",g))
 		fe->levels = .
 	}

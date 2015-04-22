@@ -1,14 +1,23 @@
 clear all
 set more off
 sysuse auto
+drop if rep==.
 cls
+
+use "D:\tmp\main.dta", clear
+rename contrib rep
+rename /*dni*/ persona foreign
+rename condicion turn
+drop if missing(rep+foreign+turn)
+
 
 * Type Aliases
 	local Integer 		real scalar
 	local Vector		real colvector
 	local Matrix		real matrix
 	local Series		real colvector // Should be N*1
-	local Varlist 		string scalar
+	local Group			real matrix // Should be N*K
+	local Varlist 		string colvector
 	local Varname 		string scalar
 	local Problem		struct MapProblem scalar
 	local FE			struct FixedEffect scalar
@@ -18,7 +27,7 @@ cls
 	include FixedEffect.mata
 	include MapProblem.mata
 	include mapsolve_init.mata
-	// include mapsolve_set.mata
+	include mapsolve_set.mata
 	include projection.mata
 
 * Test mapsolve init
@@ -31,14 +40,46 @@ end
 
 
 qui adopath + "D:\Github\reghdfe\source\_hdfe"
-local absvars "foreign    rep##c.(weight gear) B=turn (c.gear c.weight)#turn"
+qui adopath + "D:\Github\reghdfe\source\_common"
+local absvars rep#foreign   turn#rep##c.(weight gear) // B=turn (c.gear c.weight)#turn
 //local absvars "foreign##c.weight"
+
+
+local absvars rep#foreign#turn
+
+capture program drop AltID
+program define AltID, sortpreserve
+	keep `0'
+	bys `0': gen long altid = (_n==1)
+	replace altid = sum(altid)
+	compress altid
+	gen long index = _n
+end
 
 ParseAbsvars `absvars'
 mata: S = mapsolve_init()
-// mata: mapsolve_set(S)
-mata: liststruct(S)
-mata: testit()
+set rmsg on
+mata: mapsolve_set(S)
+
+
+
+set trace off
+GenerateID rep foreign turn, gen(R1)
+assert FE1==R1
+
+* 534 473 347
+* 537 486 342
+* 569 491 351
+
+AltID rep foreign turn
+assert altid==R1
+
+drop FE*
+mata: mapsolve_set(S)
+
+set rmsg off
+// mata: liststruct(S)
+// mata: testit()
 
 
 
