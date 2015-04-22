@@ -11,6 +11,8 @@
 	discard
 	
 * Run scripts
+	run test-absvars // Need to fix so we can find the path of the ADO
+
 	*run test-minimal
 	set trace off
 	set tracedepth 5
