@@ -1,69 +1,72 @@
 clear all
+set more off
+sysuse auto
+cls
 
 * Type Aliases
-local Varlist 		string scalar
-local Varname 		string scalar
+	local Integer 		real scalar
+	local Vector		real colvector
+	local Matrix		real matrix
+	local Series		real colvector // Should be N*1
+	local Varlist 		string scalar
+	local Varname 		string scalar
+	local Problem		struct MapProblem scalar
+	local FE			struct FixedEffect scalar
 
-local Integer 		real scalar
-local VarByFE 		real colvector // Should be levels*1
-local Series		real colvector // Should be N*1
-local Matrix		real matrix
+* Mata Includes
+	include assert_msg.mata
+	include FixedEffect.mata
+	include MapProblem.mata
+	include mapsolve_init.mata
+	// include mapsolve_set.mata
+	include projection.mata
 
-local SharedData 	external struct FixedEffect vector
+* Test mapsolve init
+mata:
+	function testit() {
+		123
+	}
+end
 
+
+
+qui adopath + "D:\Github\reghdfe\source\_hdfe"
+local absvars "foreign    rep##c.(weight gear) B=turn (c.gear c.weight)#turn"
+//local absvars "foreign##c.weight"
+
+ParseAbsvars `absvars'
+mata: S = mapsolve_init()
+// mata: mapsolve_set(S)
+mata: liststruct(S)
+mata: testit()
+
+
+
+
+
+
+
+exit
 mata:
 mata set matastrict on
 
-void assert_msg(real scalar t, | string scalar msg)
-{
-	if (args()<2 | msg=="") msg = "assertion is false"
-        if (t==0) _error(msg)
-}
-
-struct FixedEffect {
-	`Integer'	order 			// "g", the position in varlist
-	`Integer'	num_slopes
-	`Integer'	has_intercept
-	`Integer'	levels			// Number of categories spanned by the ivars
-	`Varlist'	ivars			// number of i.var elements
-	`Varlist'	cvars			// number of c.var elements or slopes
-	`Varname'	varlabel		// Original label of this absvar
-	`Varname'	estimates		// Name of the variable that will hold the estimates for the FE
-
-}
-
-struct MapProblem {
-	struct FixedEffect	vector fixed_effects
-	`Integer'			G 			// Number of FEs when bunching slopes
-	`Integer'			G_expanded 	// Number of FEs incl. slopes
-	`Varname'			weightvar 	// Variable contaning the fw/pw/aw
-	real scalar foobar
-	real scalar spam
-
-	* fixed_effects = J(G, 1, FixedEffect())
-}
-
-struct MapProblem scalar function mapsolve_init(string scalar absvars) {
-	struct MapProblem scalar 	S
-	string vector				toks
-	`Integer'					g, G, Kg
-	`Integer'					G_expanded // Counts fixed slopes as independent categories
-	
-	toks = tokens(absvars)
-	G = cols(toks)
-
-	tok
-
-	S.foobar = 2
-	S.spam = 7
-	return(S)
-}
 
 function borrar() {
-	struct MapProblem scalar x // or transmorphic
-	x = mapsolve_init("turn i.trunk")
+	`Problem' x // or transmorphic
+	x = mapsolve_init()
 	x.foobar + x.spam
 }
+
+function lee_absvars(string vector cvars) {
+	`Matrix' X
+	`Vector' p
+	// Falta meter weights..
+	X = st_data(., cvars)
+	p = order(X, 1..cols(X))
+	// _collate(X, p)
+	return(X)
+}
+
 
 
 
@@ -71,8 +74,24 @@ end
 
 clear
 sysuse auto
+gen byte ok = rep >2
+tab ok, m
+drop if rep==.
 mata: borrar()
 
+set more off
+mata: z = lee_absvars(tokens("foreign rep"))
+mata: w = st_data(.,"ok")
+mata: mm_freq(z,w,levels=.)
+mata: levels
+mata: z
+
+mata: st_view(ivars=., ., tokens("foreign rep"))
+mata: p = order(ivars, 1..cols(ivars))
+mata: id = J(rows(ivars), 1, 0)
+// mata: id = id + 
+
+exit
 
 * S = mapsolve_init(transform={Kaczmarz,Cimmino,Symmetric_kaczmarz} , acceleration=...lol, tol=..., fe_varlist=...?)
 * project(series, g, S)
@@ -94,6 +113,88 @@ Hernández-Ramos, Luis M., René Escalante, and Marcos Raydan. "Unconstrained op
 
 
 /*
+
+# Al inicio de cada variable:
+
+input y
+y = y[p1]
+
+# En cada loop:
+
+for j=1:levels(FE1)
+	start = ..
+	end =  ..
+	projection[j] = sum(y(start:end))
+next
+
+projection = projection / count_fe1
+projection = repeat(projection, countfe1)
+
+Para el FE2, repetir pero hacer antes
+y = y[p2] donde p2 no va de 0 a 2 sino de 1 a 2!
+
+
+es decir que para cada FE necesito siempre una variable mas..
+
+
+al inicio de todo que necesito?
+1) calcular promedios por grupo
+2) matar singletons
+3) calcular niveles
+
+para que necesitaria pasar los niveles a la data?
+- al devolver los FEs (y x lo tanto para hacer predicts)
+
+
+
+
+
+levels = _mm_uniqrows
+para generar mm_freq en algun momento genere el ID
+
+weights as first-class citizens
+
+me basta con generar el map ivar -> ID una vez
+
+tengo
+F = ivar1,ivar2,..,ivarN,id,freq (id es tacito xq es row #)
+p (permutacion)
+
+notar que puedo hacer
+gen id1 = 0
+mata: id1[invorder(p)] = 1..rows(freq_table)
+
+WAIT:
+si la tabla de freq esta sorteada, lo que tengo q hacer es (freq[col=index])[invorder(p)]
+
+
+supon que hago el MM-freq o algo asi con weights
+
+cuando un grupo tenga freq==1, me lo bajo
+que pasa si trato a los singletons como weight=0 ??!?
+
+
+
+entender que puedo meter assignments dentro de evals.. 
+
+order(X,idx)
+_collate(X,p) = X[p, .]
+_sort usa collate
+
+invorder
+revorder
+
+Y = X[p, .]
+X = Y[invorder(p), .]
+
+En matrix notation, llama P a la permutation matrix (una I trucha)
+Entonces, Y = PX , X = inv(P) Y
+
+Codigo:
+p2[p] = (r>1 ? 1::r : 1..c)
+Lo unico que hace
+
+
 
 como me bajo singletons recursivamente?
 como genero los IDs?
