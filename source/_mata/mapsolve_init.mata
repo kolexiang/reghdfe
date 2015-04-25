@@ -2,7 +2,7 @@ mata:
 mata set matastrict on
 
 //  Parse absvars and initialize the almost empty MapProblem struct
-`Problem' function mapsolve_init() {
+`Problem' function mapsolve_init(`Integer' verbose) {
 	`Problem' 	S
 	pointer(`FE') 	fe
 	`Integer'		g, G
@@ -10,7 +10,9 @@ mata set matastrict on
 
 	G = st_numscalar("r(G)")
 	S.G = G
+	S.verbose = verbose
 	
+	if (S.verbose>0) printf("{txt}mapsolve_init()  initializing MapProblem structure\n")
 	S.fixed_effects = FixedEffect(G)
 	for (g=1; g<=G; g++) {
 		fe = &(S.fixed_effects[g])
@@ -22,6 +24,7 @@ mata set matastrict on
 		fe->ivars = tokens(st_global( sprintf("r(ivars%f)",g) ))
 		fe->cvars = tokens(st_global( sprintf("r(cvars%f)",g) ))
 		fe->target = st_global(sprintf("r(target%f)",g))
+		fe->idvarname = sprintf("__ID%f__", g)
 		fe->levels = .
 	}
 

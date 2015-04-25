@@ -9,5 +9,8 @@ mata set matastrict on
 		`Varlist'	ivars			// number of i.var elements
 		`Varlist'	cvars			// number of c.var elements or slopes
 		`Series'	target			// Name of the variable that will hold the estimates for the FE
+		`Boolean'	is_sortedby		// 1 if the dataset is sorted by the ivars of this FE
+		`Series'	p 				// Permutation vector
+		`Varname'	idvarname		// (optional) Name of variable with the absvar categories
 	}
 end
