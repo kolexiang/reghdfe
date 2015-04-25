@@ -4,54 +4,67 @@ mata set matastrict on
 // Note: So far, this function uses 5 + G rows, which may be quite a lot!
 
 void function drop_singletons(struct FixedEffect vector fes, `Integer' verbose) {
-	`Integer' G, i, g, h, i_last_singleton, num_singletons
+	`Integer' G, i, g, h, i_last_singleton, num_singletons, sortedby
 	`Series' delta, singleton, sum_singleton, id, inv_p
-	`Varnames' idvarnames
-	pointer(`Series') scalar ptr_p // Just to shorten code
+	`Varlist' idvarnames
+	string scalar vartype
+	pointer(`Series') scalar pp // Just to shorten code
 
 	G = length(fes)
 	i = i_last_singleton = g = 1
 
 	while (i<i_last_singleton+G) {
 		if (g>G) g = 1
-		if (verbose>0) printf("{txt}i=%f (g=%f/%f) (N=%f) ", i, g, G, st_nobs())
+		if (verbose>0) printf("{txt}\ti=%f (g=%f/%f)\t(N=%f)\t", i, g, G, st_nobs())
 
 		idvarnames = i<=G ? fes[g].ivars : fes[g].idvarname
 		id = st_data(., idvarnames)
-		if (i<=G) fes[g].p = order( id , 1..length(idvarnames) )
-		_collate(id, fes[g].p)
+		if (i<=G) fes[g].is_sortedby = already_sorted(idvarnames)
+		sortedby = fes[g].is_sortedby
+		if (i<=G & !sortedby) fes[g].p = order( id , 1..length(idvarnames) )
+		
+		if (!sortedby) {
+			_collate(id, fes[g].p) // sort id by p
+			inv_p = invorder(fes[g].p) // construct inv(p) that we'll use later
+		}
 
 		delta = rows_that_change(id)
 		singleton = select_singletons(delta)
 
-		inv_p = invorder(fes[g].p)
 
 		// Save IDs in dataset before dropping observations
-		if (i<=G) st_addvar(vartype, fes[g].idvarname)
-		id = runningsum(delta)
+		id = runningsum(delta :* !singleton)
 		fes[g].levels = id[length(id)]
 		vartype = fes[g].levels<=100 ? "byte" : (fes[g].levels<=32740? "int" : "long")
-		st_store(., st_addvar(vartype, fes[g].idvarname), id[inv_p]) // Profiler: 5%
+		if (i<=G) {
+			st_store(., st_addvar(vartype, fes[g].idvarname), sortedby? id : id[inv_p])
+		}
+		else {
+			st_store(., fes[g].idvarname, sortedby? id : id[inv_p])
+		}
 
 		num_singletons = sum(singleton)
-		if (num_singleton>0) {
-			if (verbose>0) printf("{txt}(%f singletons found)\n", num_singleton)
+		if (num_singletons>0) {
+			if (verbose>0) printf("{txt}(%f singletons)", num_singletons)
 			i_last_singleton = i
 
 			// Sort -singleton- as in the dataset, and use it to drop observations
-			singleton = singleton[inv_p]
+			singleton = sortedby? singleton : singleton[inv_p]
 			st_dropobsif(singleton)
+			if (!st_nobs()) {
+				printf("{err}\nno observations left after dropping singletons\n")
+				exit(error(2001))
+			}
 
 			// But now our precious sort orders (the p's) are useless! Fix them
 			sum_singleton = runningsum(singleton)
 			for (h=1;h<=G & h<=i; h++) {
-				ptr_p = &(fes[h].p)
-				(*ptr_p) = select(*ptr_p - sum_singleton[*ptr_p] , !singleton[*ptr_p] )
+				if (fes[h].is_sortedby) continue
+				pp = &(fes[h].p)
+				(*pp) = select(*pp - sum_singleton[*pp] , !singleton[*pp] )
 			}
 		}
-		else {
-			if (verbose>0) printf("{txt}(no singletons)\n"
-		}
+		if (verbose>0) printf("{txt}\n")
 
 		// Maybe I can reuse -delta- and put it in the IDs to save one vector?
 		// TODO

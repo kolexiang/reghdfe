@@ -19,24 +19,48 @@ mata:
 	void function testit(struct MapProblem scalar S) {
 		drop_singletons(S.fixed_effects, S.verbose)
 		55555
-		S_fixed_effects[1].levels
+		S.fixed_effects[1].levels
+		S.fixed_effects[1].is_sortedby
+		S.fixed_effects[2].levels
+		S.fixed_effects[2].is_sortedby
 		66666
 	}
 end
 
-local absvars rep#foreign   turn#rep##c.(weight gear) // B=turn (c.gear c.weight)#turn
+//local absvars rep#foreign   turn#rep##c.(weight gear) // B=turn (c.gear c.weight)#turn
 //local absvars "foreign##c.weight"
 //local absvars rep#foreign#turn
 
-// sort rep foreign turn
+local absvars rep#foreign rep#trunk turn#trunk trunk#foreign
 
 set rmsg off
 timer clear
+sort rep foreign
 ParseAbsvars `absvars', clustervars(`clustervars')
 mata: S = mapsolve_init(2)
-mata: S.G>2
 //mata: mapsolve_set(S)
+set rmsg on
 mata: testit(S)
+cou
+tab1 __ID*__, m
+
+* Check
+sysuse auto, clear
+drop if missing(rep)
+
+*global absvars1 rep foreign
+*global absvars2 turn rep
+
+global absvars1 rep foreign
+global absvars2 rep trunk
+global absvars3 turn trunk
+global absvars4 trunk foreign
+sort rep foreign
+set rmsg on
+NaiveDropSingletons 4
+set rmsg off
+tab1 id*, m
+
 
 
 *GenerateID rep foreign turn, gen(R1)
