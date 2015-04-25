@@ -18,18 +18,20 @@ void function drop_singletons(struct FixedEffect vector fes, `Integer' verbose) 
 		if (verbose>0) printf("{txt}\ti=%f (g=%f/%f)\t(N=%f)\t", i, g, G, st_nobs())
 
 		idvarnames = i<=G ? fes[g].ivars : fes[g].idvarname
-		id = st_data(., idvarnames)
+		id = st_data(., idvarnames) // 2% of runtime
 		if (i<=G) fes[g].is_sortedby = already_sorted(idvarnames)
 		sortedby = fes[g].is_sortedby
-		if (i<=G & !sortedby) fes[g].p = order( id , 1..length(idvarnames) )
+		if (i<=G & !sortedby) {
+			fes[g].p = order( id , 1..length(idvarnames) ) // 55% of function time
+		}
 		
 		if (!sortedby) {
-			_collate(id, fes[g].p) // sort id by p
+			_collate(id, fes[g].p) // sort id by p // 12% of function time
 			inv_p = invorder(fes[g].p) // construct inv(p) that we'll use later
 		}
 
-		delta = rows_that_change(id)
-		singleton = select_singletons(delta)
+		delta = rows_that_change(id) // 7% of function time
+		singleton = select_singletons(delta) // 5% of function time
 
 
 		// Save IDs in dataset before dropping observations
@@ -49,6 +51,7 @@ void function drop_singletons(struct FixedEffect vector fes, `Integer' verbose) 
 			i_last_singleton = i
 
 			// Sort -singleton- as in the dataset, and use it to drop observations
+			// 5% of function time
 			singleton = sortedby? singleton : singleton[inv_p]
 			st_dropobsif(singleton)
 			if (!st_nobs()) {
@@ -58,7 +61,7 @@ void function drop_singletons(struct FixedEffect vector fes, `Integer' verbose) 
 
 			// But now our precious sort orders (the p's) are useless! Fix them
 			sum_singleton = runningsum(singleton)
-			for (h=1;h<=G & h<=i; h++) {
+			for (h=1;h<=G & h<=i; h++) { // 6% of function time
 				if (fes[h].is_sortedby) continue
 				pp = &(fes[h].p)
 				(*pp) = select(*pp - sum_singleton[*pp] , !singleton[*pp] )
