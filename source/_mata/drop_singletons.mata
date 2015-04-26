@@ -99,6 +99,9 @@ void function drop_singletons(struct FixedEffect vector fes,
 		i++
 		g++
 	}
+
+	// TODO: Save the counts for each level for each g
+	// Do it weighted from the onset
 }
 
 // --------------------------------------------------------------------------------------
@@ -161,3 +164,66 @@ void function drop_singletons(struct FixedEffect vector fes,
 }
 
 end
+
+
+
+
+/*
+Projection Strategy
+
+General case (multiple slopes, weights):
+
+	On Setup:
+		Divide Xs (cvars) by their STDEV (not by groups, all in one go)
+		
+		Compute x_demeaned (BY GROUP) = x - sum(x:* w) / sum(w) (o count!)
+		Compute inv_xx (BY GROUP), a KL*K matrix (K excludes constant)
+			= invsym(cross(x_demeaned, w, x_demeaned))
+
+		[Why do we compute x_demeaned? b/c we don't use x at all, only the demeaned so it's easy even for computing proj]
+
+	When receiving Y:
+		Standardize Y like we did the Xs
+
+	On the fly:
+		ymean = sum(y) / denom (where denom = N or = sum(w))
+		b = inv_xx * crossdev(x_demeaned, 0, w, y, ymean)
+		proj = ymean + x_demeaned * b
+
+No weights:
+	
+	Easy-ish, just change all the -w- part (can we put 1? or drop it?)
+
+No intercept, just slopes:
+
+	In that case, we don't need the demeaning (which is just FW wrt to the constant)
+	x_demeaned is just x; inv_xx stays the same; we don't compute ymean; b stays the same except we use cross(); proj has no ymean part.
+
+Intercept and just one slope:
+
+	The only potential optimization is that invsym can be replaced by 1 / cross(..)
+
+Only intercept (MOST COMMON CASE):
+
+	proj is just ymean
+	we have already preocomputed denom in the same way as in prev. cases
+	we just need to compute sum(y) , and we use the offset vector for that
+
+Maybe we can do just ONE function that is general..
+
+Eg:
+proj = has_intercept ? sum(y) / denom : 0 // ymean part
+if K>0 {
+	b = inv_xx[] * crossdev(x_demeaned, 0, w, y, proj)
+	proj = proj + x_demeaned * b
+}
+store back in proj vector
+
+Complications:
+	If for a given group, an X is ZERO, then invsym is not defined.. what do we do?
+
+
+
+
+
+*/
