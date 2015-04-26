@@ -17,7 +17,7 @@ include reghdfe.mata
 * Test mapsolve init
 mata:
 	void function testit(struct MapProblem scalar S) {
-		drop_singletons(S.fixed_effects, S.verbose)
+		drop_singletons(S.fixed_effects, S.verbose, ("foreign") )
 		55555
 		S.fixed_effects[1].levels
 		S.fixed_effects[1].is_sortedby
