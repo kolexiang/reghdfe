@@ -2,7 +2,7 @@ mata:
 mata set matastrict on
 
 //  Parse absvars and initialize the almost empty MapProblem struct
-`Problem' function mapsolve_init(`Integer' verbose) {
+`Problem' function mapsolve_init(`Integer' verbose, | `Varname' weightvar) {
 	`Problem' 	S
 	pointer(`FE') 	fe
 	`Integer'		g, G
@@ -11,11 +11,12 @@ mata set matastrict on
 	G = st_numscalar("r(G)")
 	S.G = G
 	S.verbose = verbose
+	S.weightvar = args()<2 ? "" : weightvar
 	
 	if (S.verbose>0) printf("{txt}mapsolve_init()  initializing MapProblem structure\n")
-	S.fixed_effects = FixedEffect(G)
+	S.fes = FixedEffect(G)
 	for (g=1; g<=G; g++) {
-		fe = &(S.fixed_effects[g])
+		fe = &(S.fes[g])
 		// recall a->b is the same as (*a).b
 		fe->order = g
 		fe->varlabel = st_global(sprintf("r(varlabel%f)",g))

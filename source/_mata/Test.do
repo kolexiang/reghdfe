@@ -17,32 +17,46 @@ include reghdfe.mata
 * Test mapsolve init
 mata:
 	void function testit(struct MapProblem scalar S) {
-		drop_singletons(S.fixed_effects, S.verbose, ("foreign") )
-		55555
-		S.fixed_effects[1].levels
-		S.fixed_effects[1].is_sortedby
-		S.fixed_effects[2].levels
-		S.fixed_effects[2].is_sortedby
-		66666
+		mapsolve_precompute(S, tokens("foreign gear_ratio displacement") )
+		101010
+		S.verbose
+		S.G
+		S.fes[1].levels
+		S.fes[1].inv_xx
+		quadcross(S.fes[1].x, S.w)
+		// liststruct(S)
+		S.fes[1].cvars
+		1337
+		// S.fes[2].x
+		mapsolve_project(S, 1, st_data(., tokens("price u") ))
 	}
 end
 
 //local absvars rep#foreign   turn#rep##c.(weight gear) // B=turn (c.gear c.weight)#turn
 //local absvars "foreign##c.weight"
 //local absvars rep#foreign#turn
-
-local absvars rep#foreign rep#trunk turn#trunk trunk#foreign
+local absvars rep#foreign##c.(gear displacement) turn##c.weight trunk // rep#trunk turn#trunk trunk#foreign
 
 set rmsg off
 timer clear
-sort rep foreign
+sort rep foreign, stable
+gen www = 1 // + int(head)
+gen u = uniform()
 ParseAbsvars `absvars', clustervars(`clustervars')
-mata: S = mapsolve_init(2)
-//mata: mapsolve_set(S)
+mata: S = mapsolve_init(2, "www")
 set rmsg on
+egen rf = group(rep foreign)
 mata: testit(S)
+
+reg price rf##c.(gear_ratio displacement)
+predict double xb, xb
+br xb
+
+exit
 cou
-tab1 __ID*__, m
+tab1 __ID*__ [fw=www], m
+
+exit
 
 * Check
 sysuse auto, clear
