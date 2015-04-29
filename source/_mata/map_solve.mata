@@ -61,7 +61,7 @@ void function map_solve(`Problem' S, `Varlist' vars, | `Varlist' newvars) {
 	`Group'		resid
 
 	for (iter=1; iter<=S.maxiterations; iter++) {
-		resid = (*T)(S, y)
+		(*T)(S, y, resid)
 		if (check_convergence(S, iter, resid, y)) break
 		y = resid
 	}
@@ -69,33 +69,46 @@ void function map_solve(`Problem' S, `Varlist' vars, | `Varlist' newvars) {
 }
 
 // -------------------------------------------------------------------------------------------------
+// Memory cost is approx = 4*size(y) (actually 3 since y is already there)
+// But we need to add maybe 1 more due to u:*v
+// And I also need to check how much does project and T use..
+// Double check with a call to memory
+
+// For discussion on the stopping criteria, see the following presentation:
+// Arioli & Gratton, "Least-squares problems, normal equations, and stopping criteria for the conjugate gradient method". URL: https://www.stfc.ac.uk/SCD/resources/talks/Arioli-NAday2008.pdf
+// Basically, we will use the Hestenes and Siefel rule
 
 `Group' function accelerate_cg(`Problem' S, `Group' y, `FunctionPointer' T) {
-	`Integer'	iter
-	`Group'		resid, r, u, v, resid_old
-	real rowvector alpha, beta, ssr, ssr_old, denominator
-	`Matrix' R
-
-timer_on(61)
-	resid = y
-	r = y - (*T)(S, resid)
+	// BUGBUG iterate the first 6? without acceleration??
+	`Integer'	iter, d, Q
+	`Group'		r, u, v
+	real rowvector alpha, beta, ssr, ssr_old, denominator, improvement_potential
+	`Matrix' R, recent_ssr
+	Q = cols(y)
+	d = 1 // BUGBUG Set it to 2/3 // Number of recent SSR values to use for convergence criteria (lower=faster & riskier)
+	improvement_potential = quadcolsum(y :* y)
+	recent_ssr = J(d, Q, .)
+	
+	(*T)(S, y, r, 1)
 	ssr = quadcolsum(r :* r) // cross(r,r) when cols(y)==1 // BUGBUG maybe diag(quadcross()) is faster?
 	u = r
-timer_off(61)
+
 	for (iter=1; iter<=S.maxiterations; iter++) {
-timer_on(62)
-		v = u - (*T)(S, u)
+		(*T)(S, u, v, 1) // This is the hotest loop in the entire program
+		// BUGBUG: colsum or quadcolsum??
 		alpha = safe_divide( ssr , quadcolsum(u :* v) )
-		resid = resid - alpha :* u
-		ssr_old = ssr
+		recent_ssr[1 + mod(iter-1, d), .] = alpha :* ssr
+		improvement_potential = improvement_potential - alpha :* ssr
+		y = y - alpha :* u
 		r = r - alpha :* v
+		ssr_old = ssr
 		ssr = quadcolsum(r :* r)
 		beta = safe_divide( ssr , ssr_old) // Fletcher-Reeves formula, but it shouldn't matter in our problem
 		u = r + beta :* u
-		if (check_convergence(S, iter, ssr)) break
-timer_off(62)
+		// Convergence if sum(recent_ssr) > tol^2 * improvement_potential
+		if ( check_convergence(S, iter, sum(recent_ssr), improvement_potential, "hestenes") ) break
 	}
-	return(resid)
+	return(y)
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -106,7 +119,7 @@ timer_off(62)
 	real rowvector t, denominator
 
 	for (iter=1; iter<=S.maxiterations; iter++) {
-		proj = y - (*T)(S, y)
+		(*T)(S, y, proj, 1)
 		t = safe_divide( quadcolsum(y :* proj) , quadcolsum(proj :* proj) )
 		if (check_convergence(S, iter, y-proj, y)) break
 		y = y - t :* proj
@@ -134,7 +147,7 @@ timer_off(62)
 
 	for (iter=1; iter<=S.maxiterations; iter++) {
 		
-		resid = (*T)(S, y)
+		(*T)(S, y, resid)
 		accelerate = iter>=S.accel_start & !mod(iter,S.accel_freq)
 
 		// Accelerate
@@ -173,21 +186,22 @@ timer_off(62)
 
 // -------------------------------------------------------------------------------------------------
 
-`Boolean' check_convergence(`Problem' S, `Integer' iter, `Group' y_new,| `Group' y_old) {
+`Boolean' check_convergence(`Problem' S, `Integer' iter, `Group' y_new, `Group' y_old,| `String' method) {
 	`Boolean'	done, is_last_iter
 	`Real'		update_error
 
 	// max() ensures that the result when bunching vars is at least as good as when not bunching
-	if (args()>=4) {
+	if (args()<5) method = "vectors" 
+
+	if (method=="vectors") {
 		update_error = max(mean(reldif(y_new, y_old)))
 	}
-	else {
-		// We don't have two vectors, instead one SSR
-		assert(rows(y_new)==1)
-		//update_error = max(sqrt(y_new))
-		update_error = max(y_new)
+	else if (method=="hestenes") {
+		update_error = max(safe_divide( sqrt(y_new) , sqrt(y_old) ))
 	}
-
+	else {
+		exit(error(100))
+	}
 
 	done = update_error <= S.tolerance
 	is_last_iter = iter==S.maxiterations
@@ -222,53 +236,54 @@ real rowvector safe_divide(real rowvector numerator, real rowvector denominator)
 // Transformations: Compute RESIDUALS, not projections
 // -------------------------------------------------------------------------------------------------
 
-`Group' function transform_cimmino(`Problem' S, `Group' y) {
+void function transform_cimmino(`Problem' S, `Group' y, `Group' ans,| `Boolean' get_proj) {
 	`Integer' 	N, Q, g, G
-	`Group'		ans
 	N = rows(y)
 	Q = cols(y)
 	G = S.G
+	if (args()<4) get_proj = 0
 
 	ans = map_project(S, 1, y)
 	for (g=2; g<=G; g++) {
 		ans = ans + map_project(S, g, y)
 	}
-	return(y - ans / G)
+	ans = get_proj ? ans / G : y - ans / G
 }
 
 // -------------------------------------------------------------------------------------------------
 
-`Group' function transform_kaczmarz(`Problem' S, `Group' y) {
+void function transform_kaczmarz(`Problem' S, `Group' y, `Group' ans,| `Boolean' get_proj) {
 	`Integer' 	N, Q, g, G
-	`Group'		ans
 	N = rows(y)
 	Q = cols(y)
 	G = S.G
+	if (args()<4) get_proj = 0
+
 	ans = y - map_project(S, 1, y)
 	for (g=2; g<=G; g++) {
 		ans = ans - map_project(S, g, ans)
 	}
-	return(ans)
+	if (get_proj) ans = y - ans
 }
 
 // -------------------------------------------------------------------------------------------------
 
- `Group' function transform_sym_kaczmarz(`Problem' S, `Group' y) {
+ void function transform_sym_kaczmarz(`Problem' S, `Group' y, `Group' ans,| `Boolean' get_proj) {
 	`Integer' 	N, Q, g, G
-	`Group'		ans
-	timer_on(71)
+	// BUGBUG: Streamline and remove all those "ans - .." lines?
 	N = rows(y)
 	Q = cols(y)
 	G = S.G
-	ans = y - map_project_fast(S, 1, y)
+	if (args()<4) get_proj = 0
+
+	ans = y - map_project(S, 1, y)
 	for (g=2; g<=G; g++) {
-		ans = ans - map_project_fast(S, g, ans)
+		ans = ans - map_project(S, g, ans)
 	}
 	for (g=G-1; g>=1; g--) {
-		ans = ans - map_project_fast(S, g, ans)
+		ans = ans - map_project(S, g, ans)
 	}
-	timer_off(71)
-	return(ans)
+	if (get_proj) ans = y - ans
 }
 
 
