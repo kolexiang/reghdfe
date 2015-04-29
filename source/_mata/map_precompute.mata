@@ -22,11 +22,17 @@ void function map_precompute(`Problem' S, `Varlist' keepvars) {
 
 	// 1. Store permutation vectors and their invorder, generate ID variables, drop singletons
 	if (S.verbose>0) printf("{txt}    Storing permutation vectors, generating ids, dropping singletons\n")
+	timer_on(50)
 	map_precompute_part1(S, counter)
+	timer_off(50)
 
 	// 2. Store group offsets, group counters; demeaned(x), inv(xx) if num_slopes>0; weightvars
 	if (S.verbose>0) printf("{txt}    Storing counters and offsets; processing cvars\n")
+	timer_on(51)
 	map_precompute_part2(S, counter)
+	timer_off(51)
+
+	timer()
 
 	// Store N (todo: add other details) to ensure the dataset doesn't change from now on
 	S.N = st_nobs()

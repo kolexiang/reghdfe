@@ -87,7 +87,6 @@ void map_precompute_part1(`Problem' S, transmorphic counter) {
 	for (g=1;g<=G;g++) {
 		S.fes[g].inv_p = invorder(S.fes[g].p)
 	}
-
 }
 
 // -------------------------------------------------------------

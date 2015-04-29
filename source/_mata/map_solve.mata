@@ -28,6 +28,11 @@ void function map_solve(`Problem' S, `Varlist' vars, | `Varlist' newvars) {
 	// Luego bajo y asi que me quedo con y + ..
 	// Contar cuantos vectores creo en los aceleradores y en los proyectores
 
+	// Warnings
+	if (S.transform=="kaczmarz" & S.acceleration=="conjugate_gradient") {
+		printf("{err}(warning: convergence is {bf:unlikely} with transform=kaczmarz and accel=CG)\n")
+	}
+
 	// Load transform pointer
 	if (S.transform=="cimmino") transform = &transform_cimmino()
 	if (S.transform=="kaczmarz") transform = &transform_kaczmarz()
@@ -71,22 +76,24 @@ void function map_solve(`Problem' S, `Varlist' vars, | `Varlist' newvars) {
 	real rowvector alpha, beta, ssr, ssr_old, denominator
 	`Matrix' R
 
+timer_on(61)
 	resid = y
 	r = y - (*T)(S, resid)
 	ssr = quadcolsum(r :* r) // cross(r,r) when cols(y)==1 // BUGBUG maybe diag(quadcross()) is faster?
 	u = r
-
+timer_off(61)
 	for (iter=1; iter<=S.maxiterations; iter++) {
-		v = u - (*T)(S, u) // Mu, used in alpha and to update r
+timer_on(62)
+		v = u - (*T)(S, u)
 		alpha = safe_divide( ssr , quadcolsum(u :* v) )
 		resid = resid - alpha :* u
 		ssr_old = ssr
 		r = r - alpha :* v
 		ssr = quadcolsum(r :* r)
-		beta = safe_divide( ssr , ssr_old)
+		beta = safe_divide( ssr , ssr_old) // Fletcher-Reeves formula, but it shouldn't matter in our problem
 		u = r + beta :* u
-		// resid = y - (*T)(S, y)
 		if (check_convergence(S, iter, ssr)) break
+timer_off(62)
 	}
 	return(resid)
 }
@@ -108,26 +115,60 @@ void function map_solve(`Problem' S, `Varlist' vars, | `Varlist' newvars) {
 }
 
 // -------------------------------------------------------------------------------------------------
+// This is method 3 of Macleod (1986), a vector generalization of the Aitken-Steffensen method
+// Also: "when numerically computing the sequence.. stop..  when rounding errors become too 
+// important in the denominator, where the ^2 operation may cancel too many significant digits"
+// Note: Sometimes the iteration gets "stuck"; can we unstuck it with adding randomness
+// in the accelerate decision? There should be a better way.. (maybe symmetric kacz instead of standard one?)
 
 `Group' function accelerate_aitken(`Problem' S, `Group' y, `FunctionPointer' T) {
-	`Group' proj, resid1, resid2, delta2, delta1, delta21
-	real rowvector	t, denominator
-	real rowvector eps
-	// This is like accelerate_none but with a t!=1
+	`Integer'	iter
+	`Group'		resid, y_old, delta_sq
+	`Boolean'	accelerate
+	real rowvector t
 
-	resid1 = y - (*T)(S, y) // = accelerate_none(S, y, T)
-	resid2 = resid1 - (*T)(S, resid1) // = accelerate_none(S, y, T)
+	//S.pause_length = 20
+	//S.bad_loop_threshold = 1
+	//S.stuck_threshold = 5e-3
+	// old_error = oldest_error = bad_loop = acceleration_countdown = 0
 
-	delta2 = resid2 - resid1
-	delta1 = resid1 - y
-	delta21 = delta2 - delta1
+	for (iter=1; iter<=S.maxiterations; iter++) {
+		
+		resid = (*T)(S, y)
+		accelerate = iter>=S.accel_start & !mod(iter,S.accel_freq)
 
-	eps = J(1,cols(y),epsilon(1))
-	denominator = quadcolsum(delta21 :* delta21)
-	denominator = colmax(denominator \ eps)
-	t = quadcolsum( (delta2 ) :* delta21) :/ denominator
-	
-	return(resid2 - t :* delta2)
+		// Accelerate
+		if (accelerate) {
+			delta_sq = resid - 2 * y + y_old // = (resid - y) - (y - y_old) // Equivalent to D2.resid
+			// t is just (d'd2) / (d2'd2)
+			t = safe_divide( quadcolsum( (resid - y) :* delta_sq) ,  quadcolsum(delta_sq :* delta_sq) )
+			resid = resid - t :*  (resid - y)
+		}
+
+		// Only check converge on non-accelerated iterations
+		// BUGBUG: Do we need to disable the check when accelerating?
+		if (check_convergence(S, iter, accelerate? resid :* .  : resid, y)) break
+		
+		// Experimental: Pause acceleration
+		//if (accelerate) {
+		//	improvement = max(( (old_error-update_error)/update_error , (oldest_error-update_error)/update_error ))
+		//	bad_loop = improvement < stuck_threshold ? bad_loop+1 : 0
+		//	// bad_loop, improvement, update_error, old_error, oldest_error
+		//	// Tolerate two problems (i.e. 6+2=8 iters) and then try to unstuck
+		//	if (bad_loop>bad_loop_threshold) {
+		//		bad_loop = 0
+		//		if (VERBOSE==3) printf(" Fixed point iteration seems stuck, acceleration paused\n")
+		//		acceleration_countdown = pause_length
+		//	}
+		//	assert(bad_loop<=3)	
+		//	oldest_error = old_error
+		//	old_error = update_error
+		//}
+		//
+		y_old = y // y_old is resid[iter-2]
+		y = resid // y is resid[iter-1]
+	}
+	return(resid)
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -203,7 +244,6 @@ real rowvector safe_divide(real rowvector numerator, real rowvector denominator)
 	N = rows(y)
 	Q = cols(y)
 	G = S.G
-	
 	ans = y - map_project(S, 1, y)
 	for (g=2; g<=G; g++) {
 		ans = ans - map_project(S, g, ans)
@@ -216,17 +256,18 @@ real rowvector safe_divide(real rowvector numerator, real rowvector denominator)
  `Group' function transform_sym_kaczmarz(`Problem' S, `Group' y) {
 	`Integer' 	N, Q, g, G
 	`Group'		ans
+	timer_on(71)
 	N = rows(y)
 	Q = cols(y)
 	G = S.G
-	
-	ans = y - map_project(S, 1, y)
+	ans = y - map_project_fast(S, 1, y)
 	for (g=2; g<=G; g++) {
-		ans = ans - map_project(S, g, ans)
+		ans = ans - map_project_fast(S, g, ans)
 	}
 	for (g=G-1; g>=1; g--) {
-		ans = ans - map_project(S, g, ans)
+		ans = ans - map_project_fast(S, g, ans)
 	}
+	timer_off(71)
 	return(ans)
 }
 
