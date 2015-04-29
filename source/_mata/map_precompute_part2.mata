@@ -1,11 +1,10 @@
 mata:
 mata set matastrict on
-void mapsolve_precompute_part2(`Problem' S, transmorphic counter) {
+void map_precompute_part2(`Problem' S, transmorphic counter) {
 	`Integer' G, g, k, K, n
 	real scalar stdev
 	`Boolean' sortedby
 	`Series' id
-	pointer(`Series') scalar pp // Just to shorten code
 
 	G = length(S.fes)
 	if (S.weightvar!="") S.w = st_data(., S.weightvar)
@@ -17,20 +16,17 @@ void mapsolve_precompute_part2(`Problem' S, transmorphic counter) {
 		if (S.verbose>0) printf("{txt}\tg=%f/%f\t\t(K=%f)\n", g, G, K)
 		
 		id = st_data(., S.fes[g].idvarname)
-		if (!sortedby) {
-			pp = &(S.fes[g].p)
-			id = id[*pp]
-		}
+		if (!sortedby) id = id[S.fes[g].p]
 
 		// Store offsets, counts (optionally weighted)
 		S.fes[g].counts = count_by_group(id)
 		S.fes[g].offsets = runningsum(S.fes[g].counts)
-		if (S.weightvar!="") S.fes[g].counts = count_by_group(id, sortedby? S.w : S.w[*pp])
+		if (S.weightvar!="") S.fes[g].counts = count_by_group(id, sortedby? S.w : S.w[S.fes[g].p])
 
 		// Store cvars and related structures
 		if (K>0) {
 
-			// Store
+			// Store the cvars
 			S.fes[g].x = st_data(., S.fes[g].cvars)
 
 			// Drop cvars from dataset if not needed anymore
@@ -38,18 +34,18 @@ void mapsolve_precompute_part2(`Problem' S, transmorphic counter) {
 				n = asarray(counter, S.fes[g].cvars[k]) - 1
 				asarray(counter, S.fes[g].cvars[k], n)
 				if (n==0) {
-					"dropping ", S.fes[g].cvars[k]
 					st_dropvar(S.fes[g].cvars[k])
 				}
 			}
 
-			// Sort if needed
-			if (!sortedby) S.fes[g].x = S.fes[g].x[*pp,]
+			// Sort the cvars if needed
+			if (!sortedby) S.fes[g].x = S.fes[g].x[S.fes[g].p,]
 
 			// Standardize
 			// BUGBUG: Check that results don't change; specially on corner cases
 			// EG: weights, no intercept, intercept, only one slope, etc.
 			for (k=1; k<=K; k++) {
+				// BUGBUG
 				stdev = sqrt(quadvariance(S.fes[g].x[., k]))
 				if (stdev>1e-5) S.fes[g].x[., k] = S.fes[g].x[., k] :/ stdev
 			}
@@ -101,10 +97,9 @@ void mapsolve_precompute_part2(`Problem' S, transmorphic counter) {
 	// j iterates over LEVELS; i iterates over OBS
 	`Integer'	K, L, j, i_lower, i_upper
 	`Boolean'	has_weights, sortedby, has_intercept
-	`Matrix'	ans, x, tmp_x
+	`Matrix'	ans, tmp_x
 	`Vector'	w, tmp_w
 	real scalar	tmp_count
-
 	K = S.fes[g].num_slopes // Exclude intercept
 	L = S.fes[g].levels
 	ans = J(L*K, K, 0)
@@ -112,26 +107,23 @@ void mapsolve_precompute_part2(`Problem' S, transmorphic counter) {
 	sortedby = S.fes[g].is_sortedby
 	has_intercept = S.fes[g].has_intercept
 
-	x = sortedby ? S.fes[g].x : S.fes[g].x[S.fes[g].p, .]
 	if (has_weights) {
 		w = sortedby ? S.w : S.w[S.fes[g].p]
-		assert(rows(w)==rows(x))
+		assert(rows(w)==rows(S.fes[g].x))
 	}
-
+	
 	i_lower = 1
 	for (j=1; j<=L; j++) {
 		i_upper = S.fes[g].offsets[j]
 		tmp_count = S.fes[g].counts[j]
 		tmp_w = has_weights ? w[| i_lower \ i_upper |] : 1
-		tmp_x = x[| i_lower , 1 \ i_upper , . |]
+		tmp_x = S.fes[g].x[| i_lower , 1 \ i_upper , . |]
 		if (has_intercept) {
 			tmp_x = tmp_x :- (quadcolsum(has_weights ? tmp_x :* tmp_w : tmp_x) / tmp_count)
-			x[| i_lower , 1 \ i_upper , . |] = tmp_x
+			S.fes[g].x[| i_lower , 1 \ i_upper , . |] = tmp_x
 		}
 		ans[| 1+(j-1)*K , 1 \ j*K , . |] = invsym(quadcross(tmp_x, tmp_w, tmp_x))
 		i_lower = i_upper + 1
-
-		if (has_intercept) S.fes[g].x = sortedby ? x : x[S.fes[g].inv_p, .]
 
 		// BUGBUG: quadcolsum???? quadcross????
 		// use crossdev(x,means,w,x,means) if we don't demean beforehand

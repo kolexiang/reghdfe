@@ -1,6 +1,6 @@
 mata:
 mata set matastrict on
-`Group' function mapsolve_project(`Problem' S, `Integer' g, `Group' y) {
+`Group' function map_project(`Problem' S, `Integer' g, `Group' y) {
 	`Integer' 	K, L, N, Q // Q is the number of depvars
 	`Integer' 	j, i_lower, i_upper // j loops over levels, i loops over observations
 	`Boolean' 	has_weights, sortedby, has_intercept

@@ -2,22 +2,67 @@ clear all
 cls
 set more off
 
-*use "D:\tmp\main.dta", clear
-*rename  contrib /*ciiu1*/ rep
-*rename dni /*persona */ foreign
-*rename raw_ubigeo /*condicion*/ turn
-*drop if missing(rep+foreign+turn)
-sysuse auto
-drop if missing(rep)
-
 qui adopath + "D:\Github\reghdfe\source\_hdfe"
 qui adopath + "D:\Github\reghdfe\source\_common"
 include reghdfe.mata
 
+// -------------------------------------------------------------------------------------------------
+capture program drop Foobar
+program define Foobar
+	local absvars turn trunk foreign##c.displacement
+	local varlist price weight gear_ratio
+	local weightvar www
+
+	// NECESITO QUE EL SORT SEA STABLE!
+	//sort turn
+	cls
+	ParseAbsvars `absvars' // , clusterva rs(`clustervars')
+	mata: S = map_init("`weightvar'")
+	mata: map_init_transform(S, "cim")
+	mata: map_init_acceleration(S, "sd")
+	mata: map_init_verbose(S, 2)
+	mata: map_init_tolerance(S, 1e-9)
+	mata: map_init_maxiterations(S, 10000)
+
+	// kaczmarz doesn't work well with SD
+
+	preserve
+	mata: map_precompute(S, tokens("foreign gear_ratio displacement turn trunk") )
+	*mata: aaa = map_project(S, 3, st_data(., "price"))
+	*mata: mean(map_project(S, 3, st_data(., "price")))
+	*reg price ibn.foreign##c.displacement
+	*predict double xb, xb
+	*predict double resid, resid
+	*br price xb resid
+	
+	mata: map_solve(S, "`varlist'")
+	regress `varlist' , nocons
+	asd
+	restore
+
+	areg `varlist' i.trunk ibn.foreign##c.displacement, a(turn)
+	
+	// JODIDO DE ACORDARME SI ESTA BIEN < ETC
+	// IDEA:
+	// map_init("verbose", 2, "weightvar", "ww", "tolerance", 1e-6)
+	// PERO NO ES KOSHER
+end
+
+// -------------------------------------------------------------------------------------------------
+sysuse auto
+drop if missing(rep)
+sort rep foreign, stable
+gen www = 1 // + int(head)
+// gen u = uniform()
+Foobar
+
+exit
+
+
 * Test map init
 mata:
 	void function testit(struct MapProblem scalar S) {
-		map_precompute(S, tokens("foreign gear_ratio displacement turn trunk") )
+		
 		//101010
 		//S.verbose
 		//S.G
@@ -36,15 +81,12 @@ end
 //local absvars "foreign##c.weight"
 //local absvars rep#foreign#turn
 //local absvars rep#foreign##c.(gear displacement) turn##c.weight trunk // rep#trunk turn#trunk trunk#foreign
-local absvars turn trunk foreign#c.displacement
+
 
 set rmsg off
 timer clear
-sort rep foreign, stable
-gen www = 1 // + int(head)
-gen u = uniform()
-ParseAbsvars `absvars', clustervars(`clustervars')
-mata: S = map_init(2, "www")
+
+
 set rmsg on
 egen rf = group(rep foreign)
 mata: testit(S)
@@ -53,7 +95,7 @@ cls
 gen long trend = _n
 sort trend
 preserve
-//mata: map_solve(S, "price u")
+//
 mata: map_solve(S, "trend")
 restore
 

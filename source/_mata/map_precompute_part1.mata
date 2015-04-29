@@ -1,6 +1,6 @@
 mata:
 mata set matastrict on
-void mapsolve_precompute_part1(`Problem' S, transmorphic counter) {
+void map_precompute_part1(`Problem' S, transmorphic counter) {
 
 	`Integer' G, i, j, n, g, h, i_last_singleton, num_singletons
 	`Boolean' sortedby
@@ -34,7 +34,7 @@ void mapsolve_precompute_part1(`Problem' S, transmorphic counter) {
 		if (i<=G & !sortedby) {
 			S.fes[g].p = order( id , 1..length(idvarnames) ) // 55% of function time
 		}
-		
+
 		if (!sortedby) {
 			_collate(id, S.fes[g].p) // sort id by p // 12% of function time
 			inv_p = invorder(S.fes[g].p) // construct inv(p) that we'll use later

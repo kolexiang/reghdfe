@@ -1,7 +1,7 @@
 mata:
 mata set matastrict on
 
-void function mapsolve_precompute(`Problem' S, `Varlist' keepvars) {
+void function map_precompute(`Problem' S, `Varlist' keepvars) {
 	`Integer' i, g, G
 	transmorphic counter
 	if (S.verbose>0) printf("{txt}mapsolve_precompute()\n")
@@ -12,7 +12,6 @@ void function mapsolve_precompute(`Problem' S, `Varlist' keepvars) {
 	asarray_notfound(counter, 0)
 	for (g=1; g<=G; g++) {
 		keepvars = keepvars , S.fes[g].ivars , S.fes[g].cvars
-		keepvars
 	}
 	for (i=1; i<=length(keepvars); i++) {
 		asarray(counter, keepvars[i], asarray(counter, keepvars[i])+1)
@@ -23,10 +22,13 @@ void function mapsolve_precompute(`Problem' S, `Varlist' keepvars) {
 
 	// 1. Store permutation vectors and their invorder, generate ID variables, drop singletons
 	if (S.verbose>0) printf("{txt}    Storing permutation vectors, generating ids, dropping singletons\n")
-	mapsolve_precompute_part1(S, counter)
+	map_precompute_part1(S, counter)
 
 	// 2. Store group offsets, group counters; demeaned(x), inv(xx) if num_slopes>0; weightvars
 	if (S.verbose>0) printf("{txt}    Storing counters and offsets; processing cvars\n")
-	mapsolve_precompute_part2(S, counter)
+	map_precompute_part2(S, counter)
+
+	// Store N (todo: add other details) to ensure the dataset doesn't change from now on
+	S.N = st_nobs()
 }
 end
