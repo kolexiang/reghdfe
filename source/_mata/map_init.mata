@@ -2,19 +2,20 @@ mata:
 mata set matastrict on
 
 //  Parse absvars and initialize the almost empty MapProblem struct
-`Problem' function map_init(| `Varname' weightvar)
+`Problem' function map_init()
 {
 	`Integer'		g, G
 	`Problem' 		S
 	pointer(`FE') 	fe
 
-	S.weightvar = args()<1 ? "" : weightvar
+	S.weightvar = ""
 	S.verbose = 0
 	S.transform = "cimmino"
 	S.acceleration = "conjugate_gradient"
 	S.tolerance = 1e-7
 	S.maxiterations = 1e4
 	S.accel_start = 6
+	S.save_ids = 0
 
 	// Specific to Aitken:
 	S.accel_freq = 3
@@ -38,6 +39,22 @@ mata set matastrict on
 		fe->levels = .
 	}
 	return(S)
+}
+
+void function map_init_weightvar(`Problem' S, `Varname' weightvar) {
+	if (weightvar!="") stata(sprintf("confirm numeric variable %s", weightvar))
+	S.weightvar = weightvar
+}
+
+void function map_init_keepvars(`Problem' S, `Varname' keepvars) {
+	if (keepvars!="") stata(sprintf("confirm numeric variable %s, exact", keepvars))
+	S.keepvars = tokens(keepvars)
+}
+
+
+void function map_init_save_ids(`Problem' S, `Boolean' save_ids) {
+	assert_msg(save_ids==0 | save_ids==1, "save_ids must be 0 or 1")
+	S.save_ids = save_ids
 }
 
 void function map_init_transform(`Problem' S, `String' transform) {

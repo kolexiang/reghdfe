@@ -1,5 +1,5 @@
 // -------------------------------------------------------------------------------------------------
-// Container for the Within-Transformation Code
+// Mata Code: Method of Alternating Projections with Acceleration
 // -------------------------------------------------------------------------------------------------
 
 * Type Aliases
@@ -17,7 +17,7 @@
 	local FE			struct FixedEffect scalar
 	local FunctionPointer pointer(`Group' function) scalar // Used for the Accelerate & Transform fns
 
-* Mata Includes
+// -------------------------------------------------------------------------------------------------
 	include assert_msg.mata
 	include FixedEffect.mata
 	include MapProblem.mata
@@ -27,4 +27,6 @@
 	include map_precompute_part2.mata
 	include map_project.mata
 	include map_solve.mata
+	include map_solve_accelerations.mata
+	include map_solve_transformations.mata
 // -------------------------------------------------------------------------------------------------

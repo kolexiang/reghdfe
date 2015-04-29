@@ -25,6 +25,7 @@ mata set matastrict on
 	N = rows(y)
 	Q = cols(y)
 	L = S.fes[g].levels
+	tmp_w = 1 // Harmless value for when there are no weights
 
 	// Minimize copy+order operations on y
 	if (has_weights) p_sorted_w = sortedby ? &(S.w) : &(sorted_w = S.w[S.fes[g].p, .])
@@ -49,17 +50,11 @@ mata set matastrict on
 
 		if (K>0) {
 			tmp_x = S.fes[g].x[| i_lower , 1 \ i_upper , . |]
-			if (has_intercept & has_weights) {
+			if (has_intercept) {
 				b = S.fes[g].inv_xx[| 1+(j-1)*K , 1 \ j*K , . |] * crossdev(tmp_x, zero, tmp_w, tmp_y, ymean)
 			}
-			else if (has_intercept) {
-				b = S.fes[g].inv_xx[| 1+(j-1)*K , 1 \ j*K , . |] * crossdev(tmp_x, zero, tmp_y, ymean)
-			}
-			else if (has_weights) {
-				b = S.fes[g].inv_xx[| 1+(j-1)*K , 1 \ j*K , . |] * cross(tmp_x, tmp_w, tmp_y)
-			}
 			else {
-				b = S.fes[g].inv_xx[| 1+(j-1)*K , 1 \ j*K , . |] * cross(tmp_x, tmp_y)
+				b = S.fes[g].inv_xx[| 1+(j-1)*K , 1 \ j*K , . |] * cross(tmp_x, tmp_w, tmp_y)
 			}
 		}
 		
@@ -72,4 +67,3 @@ mata set matastrict on
 	return(sortedby ? ans : ans[S.fes[g].inv_p, .])
 }
 end
-

@@ -16,7 +16,7 @@ void map_precompute_part1(`Problem' S, transmorphic counter) {
 	// Loop until we stop discovering singletons (and then a bit more to be sure; G-1 to be exact)
 	while (i<i_last_singleton+G) {
 		if (g>G) g = 1
-		if (S.verbose>0) printf("{txt}\ti=%f (g=%f/%f)\t(N=%f)\t", i, g, G, st_nobs())
+		if (S.verbose>0) printf("{txt}    - i=%f (g=%f/%f)\t(N=%f)\t", i, g, G, st_nobs())
 
 		idvarnames = i<=G ? S.fes[g].ivars : S.fes[g].idvarname
 		id = st_data(., idvarnames) // 2% of runtime
@@ -83,10 +83,6 @@ void map_precompute_part1(`Problem' S, transmorphic counter) {
 		g++
 	}
 
-	// Store precomputed inv(p)
-	for (g=1;g<=G;g++) {
-		S.fes[g].inv_p = invorder(S.fes[g].p)
-	}
 }
 
 // -------------------------------------------------------------

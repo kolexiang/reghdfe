@@ -11,22 +11,25 @@ capture program drop Foobar
 program define Foobar
 
 	ParseAbsvars $absvars // , clusterva rs(`clustervars')
-	mata: S = map_init("`weightvar'")
+	mata: S = map_init()
+	mata: map_init_weightvar(S, "$weightvar")
+	// mata: map_init_save_ids(S, 1)
 	mata: map_init_transform(S, "s") // k s c
 	mata: map_init_acceleration(S, "cg") // no sd a cg
 	mata: map_init_verbose(S, 2)
 	mata: map_init_tolerance(S, 1e-6)
 	mata: map_init_maxiterations(S, 1e4)
+	mata: map_init_keepvars(S, "date_inscripcion ciiu1 ciiu2 contribuyente raw_ubigeo")
 	// good matches appear to be s-cg k-ait c-cg?
 
 	timer on 11
-	mata: map_precompute(S, tokens("date_inscripcion foreign gear_ratio displacement turn trunk ciiu1 ciiu2 contribuyente raw_ubigeo") )
+	mata: map_precompute(S)
 	timer off 11
 	timer on 18
 	preserve
 	timer off 18
 
-	su $varlist
+	// su $varlist
 	timer on 12
 	mata: map_solve(S, "$varlist")
 	timer off 12
@@ -51,11 +54,11 @@ end
 	use "D:\tmp\main.dta"  /*if persona!=1 & estado==1 & ciiu3<. & date_inicio<=td(31dec2006)*/ , clear
 	cou
 	drop if missing(contrib+ciiu1+ciiu2+raw_ubigeo)
-	gen byte www = 2
+	gen byte www = 1
 	timer clear
 	sort contrib
 
-	global absvars ciiu1 contrib#c.date_inscripcion // ciiu2 raw_ubigeo 
+	global absvars ciiu1 contrib##c.date_inscripcion // ciiu2 raw_ubigeo 
 	global varlist ruc date_inicio deudor
 	local weightvar www
 	cls
@@ -69,7 +72,7 @@ end
 	Foobar
 	timer off 1
 	timer on 2
-	reghdfe $varlist, absorb($absvars) fast dof(none) tol(1e-6)
+	//reghdfe $varlist, absorb($absvars) fast dof(none) tol(1e-6)
 	matrix list e(b), format(%20.16g)
 	timer off 2
 	timer list

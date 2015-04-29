@@ -1,5 +1,9 @@
 mata:
 mata set matastrict on
+// -------------------------------------------------------------------------------------------------
+// Structure of a Fixed Effect
+// -------------------------------------------------------------------------------------------------
+
 	struct FixedEffect {
 		`Integer'	order 			// "g", the position in varlist
 		`Varname'	varlabel		// Original label of this absvar

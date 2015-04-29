@@ -25,6 +25,33 @@ program define hdfe, rclass
 		exit
 	}
 
+ADD OPTIONS:
+Y_BUNCH
+Y todas las demas que estan en el mata
+mejor no seria hacer un wrapper para el mata?
+o algo asi como:
+
+DENTRO DE PARSE:
+	ParseAbsvars // add clustervars
+	mata: HDFE_S = map_init()
+	ParseMAP, structure(HDFE_S) `options' // injecta de vuelta las opciones q no use // tb una opbion pa saber si calculo el OLS
+
+DESPUES DE PARSE
+	preserve
+	mata: map_precompute(HDFE_S) // destructive
+	mata: map_dof(HDFE_S) // como hago con lo del cache y con OVER>??!?
+	if (alguno pide grabar fe) clonevar y copy_y
+	mata: map_solve(HDFE_S, varlist) // HACER EL BUNCHING INTERNAMENTE DENTRO DE SOLVE!!
+	if (alguno pide grabar fe) {
+		predict double resid, resid
+		mata: map_recover_fe(HDFE_S, y, resid) // ver si alguno tiene target name, y en ese caso aplicar project a esos
+	}
+
+VER SI NECESITO??
+	mata: fe2local(HDFE_S, g)
+
+
+
 * Parse
 	syntax varlist [if] [in] [fweight aweight pweight/] , Absorb(string) ///
 		[PARTIAL(varlist numeric)] ///

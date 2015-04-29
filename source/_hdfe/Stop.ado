@@ -1,17 +1,8 @@
 capture program drop Stop
 program define Stop
-	cap mata: mata drop prev_numstep // Created at step 1
-	cap mata: mata drop VERBOSE // Created before step 1
-	cap mata: mata drop G // Num of absorbed FEs
-	cap mata: mata drop FEs // Main Mata structure
-	cap mata: mata drop betas // Temporary matrices used to store bi/multivariate regr coefs
+	cap mata: mata drop HDFE_S // Structure for the HDFE problem solved with map_solve()
 	cap mata: mata drop varlist_cache // Hash table with the names of the precomputed residuals
 	cap mata: mata drop avge_* // Drop AvgE structures
-	cap mata: mata drop weightexp weightvar
-
-	cap mata: mata drop clustervars
-	cap mata: mata drop clustervars_ivars
-	cap mata: mata drop clustervars_original
 
 	if ("${hdfe_pwd}"!="") {
 		qui cd "${hdfe_pwd}"
