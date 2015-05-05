@@ -35,4 +35,5 @@
 	include map_solve_accelerations.mata
 	include map_solve_transformations.mata
 	include map_estimate_dof.mata
+	include map_connected_groups.mata
 // -------------------------------------------------------------------------------------------------

@@ -1,12 +1,12 @@
 mata:
 mata set matastrict on
 void map_estimate_dof(`Problem' S, string rowvector adjustments, 
-		| `String' group, `String' uid, `String' groupdta) {
+		| `Varname' groupvar) {
 	`Boolean' adj_firstpairs, adj_pairwise, adj_clusters, adj_continuous, belongs, already_first_constant
 	string rowvector all_adjustments
 	`String' adj, label, basestring
-	`Integer' i, g, SuperG, SubGs, h, M_due_to_nested
-	`Vector' M, M_is_exact, is_slope, solved
+	`Integer' i, g, SuperG, SubGs, h, M_due_to_nested, num_groups, j, m
+	`Vector' M, M_is_exact, is_slope, solved, prev_g
 
 	// Parse list of adjustments/tricks to do
 	if (S.verbose>0) printf("{txt}mata: map_estimate_dof()\n")
@@ -34,10 +34,8 @@ void map_estimate_dof(`Problem' S, string rowvector adjustments,
 	}
 
 	// Can only save connected group if firstpairs or pairwise are active
-	if (args()>=3 & group!="") {
-		assert_msg(args()>=5, "map_estimate_dof error: group option requires uid and groupdata options")
-		assert_msg(uid!="", "map_estimate_dof error: group option requires uid option")
-		assert_msg(groupdta!="", "map_estimate_dof error: group option requires groupdta option")
+	if (args()<3) groupvar = ""
+	if (groupvar!="") {
 		assert_msg(adj_firstpairs | adj_pairwise, "map_estimate_dof error: group option requires 'pairwise' or 'firstpairs' adjustments")
 	}
 
@@ -92,6 +90,7 @@ void map_estimate_dof(`Problem' S, string rowvector adjustments,
 	// (Intercept-only) Excluding those already solved, the first absvar is exact, and the second can be with pairwise/firstpairs
 	i = 0
 	h = 1
+	prev_g = J(S.G, 1, 0)
 	for (g=1;g<=S.G;g++) {
 		if (!solved[h] & S.fes[g].has_intercept) {
 			i++
@@ -100,13 +99,21 @@ void map_estimate_dof(`Problem' S, string rowvector adjustments,
 			}
 			else if (i==2 & (adj_pairwise | adj_firstpairs)) {
 				M_is_exact[h] = 1
-				// Call Connected
-				// M[h] = 
+				m = map_connected_groups(S, prev_g[1], g, groupvar)
+				if (S.verbose>2) printf("{txt}    - Mobility groups between fixed intercept #%f and #%f: {res}%f\n", prev_g[1], g, m)
+				M[h] = m
 			}
 			else if (i>2 & adj_pairwise) {
 				// Call connected in a LOOP (but I need to save the list of those that I needed to check)
-				// M[h] = 
+				for (j=1; j<i; j++) {
+					m = map_connected_groups(S, prev_g[j], g)
+					if (S.verbose>2) printf("{txt}    - Mobility groups between fixed intercept #%f and #%f: {res}%f\n", prev_g[j], g, m)
+					M[h] = max((M[h], m))
+				}
+				if (S.verbose>2) printf("{txt}    - Maximum of mobility groups wrt fixed intercept #%f: {res}%f\n", g, M[h])
+
 			}
+			prev_g[i] = g
 		}
 		h = h + SubGs[g]
 	}
@@ -117,7 +124,12 @@ void map_estimate_dof(`Problem' S, string rowvector adjustments,
 		for (g=1;g<=S.G;g++) {
 			for (i=1;i<=SubGs[g];i++) {
 				h++
-				if (is_slope[h]) // & S.fes[g].has_intercept
+				// If model has intercept, redundant cvars are those that are CONSTANT
+				// Without intercept, a cvar has to be zero within a FE for it to be redundant
+				// Since S.fes[g].x are already demeaned IF they have intercept, we don't have to worry about the two cases
+				if (is_slope[h]) {
+					M[h] = count_redundant_cvars(S, g, i)
+				}
 			}
 		}
 	}
@@ -143,6 +155,28 @@ void map_estimate_dof(`Problem' S, string rowvector adjustments,
 	// Return saved_group ?? 
 
 }
+
+`Integer' function count_redundant_cvars(`Problem' S, `Integer' g, `Integer' i) {
+	`Integer' j, i_lower, i_upper, ans, L, ii
+	real rowvector min_max
+	`Series' x
+
+	ii = i-S.fes[g].has_intercept
+	ans = 0
+	L = S.fes[g].levels
+	x = S.fes[g].x[., ii]
+	
+	i_lower = 1
+	for (j=1;j<=L; j++) {
+		i_upper = S.fes[g].offsets[j]
+		min_max = minmax(x[| i_lower \ i_upper |])
+		if (sqrt(epsilon(1))>abs(min_max[1]) & sqrt(epsilon(1))>abs(min_max[2])) ans++
+		i_lower = i_upper + 1
+	}
+	if (S.verbose>=2) printf("{txt}    - Fixed slope {res}%s#c.%s {txt}has {res}%f/%f{txt} redundant coefs.\n", invtokens(S.fes[g].ivars,"#"), S.fes[g].cvars[ii], ans, L)
+	return(ans)
+}
+
 end
 
 /*

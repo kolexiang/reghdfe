@@ -13,6 +13,9 @@ void map_precompute_part1(`Problem' S, transmorphic counter) {
 	G = length(S.fes)
 	i = i_last_singleton = g = 1
 
+	// Give huge warning if keeping singletons
+	if (S.keepsingletons) printf("{err}[WARNING] Singletons are not dropped; statistical significance will be biased\n")
+
 	// Loop until we stop discovering singletons (and then a bit more to be sure; G-1 to be exact)
 	while (i<i_last_singleton+G) {
 		if (g>G) g = 1
@@ -42,7 +45,7 @@ void map_precompute_part1(`Problem' S, transmorphic counter) {
 
 		// Note that the lhs is actually the deltas, as in "bys id: gen delta = _n==1"
 		id = rows_that_change(id) // 7% of function time
-		singleton = select_singletons(id) // 5% of function time
+		singleton = S.keepsingletons ? J(rows(id), 1, 0) : select_singletons(id) // 5% of function time
 
 		// Save IDs in dataset before dropping observations
 		id = runningsum(id :* !singleton) // this is the ID now, not the deltas anymore
@@ -126,7 +129,7 @@ void map_precompute_part1(`Problem' S, transmorphic counter) {
 	`Vector' ans
 	`Integer' i, j, N, stepsize
 
-	// Size of blocks of matrices used (larger=faster smaller=less memory)
+	// Size of blocks of matrices used (larger= hopefully faster, but smaller=less memory)
 	// Benchmarks with 3 unsorted ivars showed 1e4 was fastest, followed by 1e3 and then 1e5
 	stepsize = 1e4
 

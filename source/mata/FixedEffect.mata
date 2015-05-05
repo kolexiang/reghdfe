@@ -21,7 +21,7 @@ mata set matastrict on
 
 		`Vector'	offsets			// Pos. of last obs. with that category (when sorted)
 		`Vector'	counts			// number of obs. (weighted) with that value
-		`Group'		x				// Vector of (demeaned) cvars
+		`Group'		x				// Vector/Matrix of (optionally demeaned) cvars
 		`Matrix'	inv_xx			// Blocks of the inv(x'x) matrix; size KL*K (k=num_slopes, L=levels)
 
 		`Boolean'	is_clustervar, in_clustervar

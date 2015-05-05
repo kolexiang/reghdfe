@@ -16,6 +16,7 @@ struct MapProblem {
 	`Varlist'		keepvars		// By default we drop cvars and ivars ASAP; this prevents it (useful for clustervars and for timevar+panelvar under HAC errors)
 
 	`Boolean'		will_save_fe	// True if at least one FE will be saved
+	`Boolean'		keepsingletons	// If set to 1, it will not drop singletons (do not touch this!)
 
 	`Integer'		C				// Number of cluster variables
 	`Varlist'		clustervars

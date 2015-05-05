@@ -32,6 +32,7 @@ mata set matastrict on
 	S.stuck_threshold = 5e-3
 	S.N = .
 
+	S.keepsingletons = 0
 	S.G = G = st_numscalar("r(G)")
 	S.C = 0
 	S.clustervars = S.clustervars_original = J(0,0,"")
@@ -136,6 +137,11 @@ void function map_init_maxiterations(`Problem' S, `Integer' maxiterations) {
 	assert_msg(round(maxiterations)==maxiterations, "maxiterations must be an integer")
 	assert_msg(maxiterations>0, "maxiterations must be positive")
 	S.maxiterations = maxiterations
+}
+
+void function map_init_keepsingletons(`Problem' S, `Boolean' keepsingletons) {
+	assert_msg(keepsingletons==0 | keepsingletons==1, "keepsingletons must be 0 or 1")
+	S.keepsingletons = keepsingletons
 }
 
 end

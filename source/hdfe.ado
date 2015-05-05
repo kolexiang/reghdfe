@@ -19,6 +19,7 @@ program define hdfe, rclass
 		PARTIAL(varlist numeric) /// Additional regressors besides those in absorb()
 		SAMPLE(name) ///
 		Generate(name) CLEAR /// Replace dataset, or just add new variables
+		GROUP(name) /// Variable that will contain the first connected group between FEs
 		CLUSTERVARs(varlist numeric fv max=10) /// Used to estimate the DoF
 	/// Optimization ///
 		GROUPsize(string) /// Process variables in groups of #
@@ -27,6 +28,7 @@ program define hdfe, rclass
 		Verbose(string) ///
 		TOLerance(string) ///
 		MAXITerations(string) ///
+		KEEPSINGLETONS(integer 0) /// Only use this option for debugging
 		] [*] // Remaining options 
 
 * Time/panel variables
@@ -46,6 +48,7 @@ program define hdfe, rclass
 		local weighttype `weight'
 		confirm var `weightvar', exact // just allow simple weights
 	}
+	if ("`group'"!="") confirm new var `group'
 
 * From now on, we will pollute the Mata workspace, so wrap this in case of error
 	cap noi {
@@ -61,7 +64,7 @@ program define hdfe, rclass
 		if ("``opt''"!="") mata: map_init_`opt'(HDFE_S, "``opt''")
 	}
 	* Numeric options
-	local optlist groupsize verbose tolerance maxiterations
+	local optlist groupsize verbose tolerance maxiterations keepsingletons
 	foreach opt of local optlist {
 		if ("``opt''"!="") mata: map_init_`opt'(HDFE_S, ``opt'')
 	}
@@ -83,10 +86,9 @@ program define hdfe, rclass
 * Precompute Mata objects
 	mata: map_init_keepvars(HDFE_S, "`varlist' `partial' `uid'") // Non-essential vars will be deleted
 	mata: map_precompute(HDFE_S)
-	de
 
 * Compute e(df_a)
-	mata: map_estimate_dof(HDFE_S, "pairwise clusters continuous") // within, do a anyof tokens
+	mata: map_estimate_dof(HDFE_S, "pairwise clusters continuous", "`group'")
 
 	// EstimateDoF, dofadjustments(pairwise clusters continuous)
 
