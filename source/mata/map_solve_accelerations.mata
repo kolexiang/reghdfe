@@ -166,7 +166,9 @@ mata set matastrict on
 		update_error = max(mean(reldif(y_new, y_old)))
 	}
 	else if (method=="hestenes") {
-		update_error = max(safe_divide( sqrt(y_new) , sqrt(y_old) ))
+		// If the regressor is perfectly explained by the absvars, we can have SSR very close to zero but negative
+		// (so sqrt is missing)
+		update_error = max(safe_divide( sqrt(y_new) , editmissing(sqrt(y_old), sqrt(epsilon(1)) ) , sqrt(epsilon(1)) ))
 	}
 	else {
 		exit(error(100))

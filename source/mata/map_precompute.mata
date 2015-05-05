@@ -3,7 +3,7 @@ mata set matastrict on
 
 void function map_precompute(`Problem' S) {
 	`Integer' i, g, h, value
-	`Varlist' keepvars
+	`Varlist' keepvars, cl_ivars
 	transmorphic counter, loc
 	`Varname' key
 	if (S.verbose>0) printf("{txt}mata: map_precompute()\n")
@@ -40,15 +40,15 @@ void function map_precompute(`Problem' S) {
 	}
 
 	// 1. Store permutation vectors and their invorder, generate ID variables, drop singletons
-	if (S.verbose>0) printf("{txt} - Storing permutation vectors, generating ids, dropping singletons\n")
+	if (S.verbose>0) printf("{txt} - 1. Storing permutation vectors, generating ids, dropping singletons\n")
 	map_precompute_part1(S, counter)
 
 	// 2. Store group offsets, group counters; demeaned(x), inv(xx) if num_slopes>0; weightvars
-	if (S.verbose>0) printf("{txt} - Storing counters and offsets; processing cvars\n")
+	if (S.verbose>0) printf("{txt} - 2. Storing counters and offsets; processing cvars\n")
 	map_precompute_part2(S, counter)
 
 	// 3. Create cluster IDs, report whether is/in/nested wrt cluster; store precomputed inv(p)
-	if (S.verbose>0) printf("{txt} - Storing reverse permutation vectors, creating cluster IDs\n")
+	if (S.verbose>0) printf("{txt} - 3. Storing reverse permutation vectors, creating cluster IDs\n")
 	map_precompute_part3(S, counter)
 
 	// 4. Keep only the essential variables

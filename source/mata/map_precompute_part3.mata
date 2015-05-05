@@ -1,14 +1,14 @@
 mata:
 mata set matastrict on
 void map_precompute_part3(`Problem' S, transmorphic counter) {
-	`Integer' g, h, i, j, n
+	`Integer' g, h, i, j, n, L, i_lower, i_upper
 	`Varname' var
 	`Boolean' done, is_nested, sortedby
-	`Vector' need_to_create_clustervar
+	`Vector' need_to_create_clustervar, range
 	`Varlist' sorted_fe_ivars, sorted_cl_ivars, cl_ivars
 	`String' vartype
 	`Group' id
-	`Series' p
+	`Series' p, sorted_cl_id
 
 	need_to_create_clustervar = J(S.C, 1, 1)
 
@@ -34,7 +34,7 @@ void map_precompute_part3(`Problem' S, transmorphic counter) {
 				st_global(sprintf("%s[is_clustervar]", var), "1")
 				st_varlabel(var, sprintf("[CLUSTER] %s", st_varlabel(var)))
 				done = 1
-				continue
+				break
 			}
 		}
 	}
@@ -64,14 +64,13 @@ void map_precompute_part3(`Problem' S, transmorphic counter) {
 			_collate(id, p) // sort id by p // 12% of function time
 		}
 		id = runningsum(rows_that_change(id))
-		levels = id[rows(id)]
-		vartype = levels<=100 ? "byte" : (levels<=32740? "int" : "long")
+		L = id[rows(id)]
+		vartype = L<=100 ? "byte" : (L<=32740? "int" : "long")
 		S.clustervars[h] = sprintf("__CL%f__", h)
 		asarray(counter, S.clustervars[h], asarray(counter, S.clustervars[h])+1)
 		st_store(., st_addvar(vartype, S.clustervars[h]), sortedby ? id : id[invorder(p)])
 		st_varlabel(S.clustervars[h], sprintf("[CLUSTER] %s", S.clustervars_original[h]))
 	}
-	mata drop id, p
 
 	for (g=1;g<=S.G;g++) {
 		var = S.fes[g].idvarname
@@ -81,31 +80,47 @@ void map_precompute_part3(`Problem' S, transmorphic counter) {
 
 		// 2. Check if the FE ivars are a superset of those of the cluster (in_clustervar=1)
 		for (h=1; h<=S.C;h++) {
-			sorted_cl_ivars = tokens(S.clustervars[h], "#")
+			sorted_cl_ivars = tokens(S.clustervars_original[h], "#")
 			sorted_cl_ivars = sort(select(sorted_cl_ivars, sorted_cl_ivars:!="#"), 1)
 			if (length(sorted_cl_ivars)>=length(sorted_fe_ivars)) continue
 			is_nested = 1
 			for (i=1;i<=length(sorted_cl_ivars);i++) {
 				if (!anyof(sorted_fe_ivars, sorted_cl_ivars[i])) {
 					is_nested = 0
-					continue
+					break
 				}
 			}
 			if (is_nested) {
 				st_global(sprintf("%s[in_clustervar]", var), "1")
+				st_global(sprintf("%s[nesting_clustervar]", var), S.clustervars[h])
 				done = 1
-				continue
+				break
 			}
 		}
 		if (done) continue
 
-		// 3. Check if the FE is nested within a cluster (in_clustervar=1; e.g. cluster=state FE=zipcode)
-		// ...
-		// ver codigo de projections
-		// idea: for all levels of the FE, clustervars must be the same
-		// That is: for j =1..levels, do mimmax(cluster_id) , and assert that min=max
-		// The first time that this doesn't hold, CONTINUE to the next FE
-		
+		// 3. Check if the FE is nested within a cluster (e.g. cluster=state FE=zipcode)
+		L = S.fes[g].levels
+		for (h=1; h<=S.C; h++) {
+			sorted_cl_id = st_data(., S.clustervars[h])
+			if (!S.fes[g].is_sortedby) sorted_cl_id = sorted_cl_id[S.fes[g].p]
+			i_lower = 1
+			is_nested = 1
+			for (j=1; j<=L; j++) {
+				i_upper = S.fes[g].offsets[j]
+				range = minmax(sorted_cl_id[| i_lower , 1 \ i_upper , . |])
+				i_lower = i_upper + 1
+				if (range[1]!=range[2]) {
+					is_nested = 0
+					break
+				}
+			}
+			if (is_nested) {
+				st_global(sprintf("%s[in_clustervar]", var), "1")
+				st_global(sprintf("%s[nesting_clustervar]", var), S.clustervars[h])
+				break
+			}
+		}
 	}
 
 }

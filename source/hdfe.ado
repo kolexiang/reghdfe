@@ -86,10 +86,12 @@ program define hdfe, rclass
 	de
 
 * Compute e(df_a)
+	//mata: map_dof(HDFE_S, "pairwise clusters continuous") // within, do a anyof tokens
+
 	// EstimateDoF, dofadjustments(pairwise clusters continuous)
 
 * Within Transformation
-	//mata: map_solve(HDFE_S, "`varlist'", "`newvars'", "`partial'")
+	mata: map_solve(HDFE_S, "`varlist'", "`newvars'", "`partial'")
 
 * (Optional) Save FEs
 
