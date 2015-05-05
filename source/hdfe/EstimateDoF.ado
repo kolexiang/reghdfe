@@ -56,27 +56,6 @@
 cap pr drop EstimateDoF
 program define EstimateDoF, rclass
 syntax, [DOFadjustments(string) group(name) uid(varname) groupdta(string)]
-	
-	* Parse list of adjustments/tricks to do
-	Debug, level(1) msg("(calculating degrees of freedom lost due to the FEs)")
-	local adjustement_list firstpairs pairwise clusters continuous
-	* This allows doing things like <if (`adj_clusters') ..>
-	Debug, level(2) msg(`" - Adjustments:"')
-	foreach adj of local adjustement_list {
-		local adj_`adj' : list posof "`adj'" in dofadjustments
-		Debug, level(2) msg(`"    - `adj' {col 18}{res} `=cond(`adj_`adj'',"yes","no")'"')
-	}
-
-	* Assert that the clustervars exist
-	mata: st_local("clustervars", invtokens(clustervars))
-	conf variable `clustervars', exact
-
-	mata: st_local("G", strofreal(G))
-	mata: st_local("N_clustervars", strofreal(length(clustervars)))
-
-	if ("`group'"!="") {
-		Assert (`adj_firstpairs' | `adj_pairwise'), msg("Cannot save connected groups without options pairwise or firstpair")
-	}
 
 	* Remember: fe2local stores the following:
 	* ivars cvars target varname varlabel is_interaction is_cont_interaction is_bivariate is_mock levels

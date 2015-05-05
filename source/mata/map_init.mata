@@ -56,6 +56,9 @@ mata set matastrict on
 		fe->idvarname = sprintf("__ID%f__", g)
 		fe->levels = .
 		fe->target = J(0,0,"")
+		fe->is_clustervar = 0
+		fe->in_clustervar = 0
+		fe->nesting_clustervar = .
 		
 		basetarget = st_global(sprintf("r(target%f)",g))
 		if (basetarget=="" & auto_target) basetarget = sprintf("__hdfe%f__", g)

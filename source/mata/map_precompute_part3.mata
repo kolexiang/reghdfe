@@ -16,9 +16,6 @@ void map_precompute_part3(`Problem' S, transmorphic counter) {
 		S.fes[g].inv_p = invorder(S.fes[g].p)
 		var = S.fes[g].idvarname
 		st_varlabel(var, sprintf("[ID] %s", S.fes[g].varlabel))
-		st_global(sprintf("%s[is_clustervar]", var), "0")
-		st_global(sprintf("%s[in_clustervar]", var), "0")
-		st_global(sprintf("%s[nesting_clustervar]", var), "")
 		asarray(counter, var, asarray(counter, var)+1)
 
 		done = 0
@@ -31,8 +28,8 @@ void map_precompute_part3(`Problem' S, transmorphic counter) {
 			if (sorted_fe_ivars==sorted_cl_ivars) {
 				need_to_create_clustervar[h] = 0
 				S.clustervars[h] = var
-				st_global(sprintf("%s[is_clustervar]", var), "1")
 				st_varlabel(var, sprintf("[CLUSTER] %s", st_varlabel(var)))
+				S.fes[g].is_clustervar = 1
 				done = 1
 				break
 			}
@@ -74,7 +71,7 @@ void map_precompute_part3(`Problem' S, transmorphic counter) {
 
 	for (g=1;g<=S.G;g++) {
 		var = S.fes[g].idvarname
-		if (st_global(sprintf("%s[is_clustervar]", var))=="1") continue
+		if (S.fes[g].is_clustervar) continue
 		done = 0
 		sorted_fe_ivars = sort(S.fes[g].ivars', 1)'
 
@@ -91,8 +88,8 @@ void map_precompute_part3(`Problem' S, transmorphic counter) {
 				}
 			}
 			if (is_nested) {
-				st_global(sprintf("%s[in_clustervar]", var), "1")
-				st_global(sprintf("%s[nesting_clustervar]", var), S.clustervars[h])
+				S.fes[g].in_clustervar = 1
+				S.fes[g].nesting_clustervar = h
 				done = 1
 				break
 			}
@@ -116,8 +113,8 @@ void map_precompute_part3(`Problem' S, transmorphic counter) {
 				}
 			}
 			if (is_nested) {
-				st_global(sprintf("%s[in_clustervar]", var), "1")
-				st_global(sprintf("%s[nesting_clustervar]", var), S.clustervars[h])
+				S.fes[g].in_clustervar = 1
+				S.fes[g].nesting_clustervar = h
 				break
 			}
 		}

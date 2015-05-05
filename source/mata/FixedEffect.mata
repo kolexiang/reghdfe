@@ -24,6 +24,9 @@ mata set matastrict on
 		`Group'		x				// Vector of (demeaned) cvars
 		`Matrix'	inv_xx			// Blocks of the inv(x'x) matrix; size KL*K (k=num_slopes, L=levels)
 
+		`Boolean'	is_clustervar, in_clustervar
+		`Integer'	nesting_clustervar // Clustervar that nests this FE, if any
+
 		// Temporary matrices for the stored FEs
 		`Matrix'	alphas
 		`Matrix'	tmp_alphas

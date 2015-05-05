@@ -1,6 +1,9 @@
 // -------------------------------------------------------------------------------------------------
 // Mata Code: Method of Alternating Projections with Acceleration
 // -------------------------------------------------------------------------------------------------
+	//discard
+	//pr drop _all
+	//clear all
 
 * Type Aliases
 	local Boolean 		real scalar
@@ -31,4 +34,5 @@
 	include map_solve.mata
 	include map_solve_accelerations.mata
 	include map_solve_transformations.mata
+	include map_estimate_dof.mata
 // -------------------------------------------------------------------------------------------------

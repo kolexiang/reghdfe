@@ -86,7 +86,7 @@ program define hdfe, rclass
 	de
 
 * Compute e(df_a)
-	//mata: map_dof(HDFE_S, "pairwise clusters continuous") // within, do a anyof tokens
+	mata: map_estimate_dof(HDFE_S, "pairwise clusters continuous") // within, do a anyof tokens
 
 	// EstimateDoF, dofadjustments(pairwise clusters continuous)
 
