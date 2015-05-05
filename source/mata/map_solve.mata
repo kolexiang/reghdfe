@@ -131,11 +131,4 @@ void function map_solve(`Problem' S, `Varlist' vars,
 
 }
 
-// -------------------------------------------------------------------------------------------------
-
-real rowvector safe_divide(real rowvector numerator, real rowvector denominator) {
-	 // If the denominator goes below machine precision, the division explodes
-	return( numerator :/ colmax(denominator \ J(1,cols(denominator),epsilon(1))) )
-}
-
 end

@@ -6,16 +6,11 @@ program define Debug
 
 	syntax, [MSG(string asis) Level(integer 1) NEWline COLOR(string)] [tic(integer 0) toc(integer 0)]
 	
-	cap mata: st_local("VERBOSE",strofreal(VERBOSE)) // Ugly hack to avoid using a global
-	if ("`VERBOSE'"=="") {
-		di as result "Mata scalar -VERBOSE- not found, setting VERBOSE=3"
-		local VERBOSE 3
-		mata: VERBOSE = `VERBOSE'
-	}
-
-
+	mata: verbose2local(HDFE_S, "VERBOSE")
 	assert "`VERBOSE'"!=""
-	assert inrange(`level',0, 4)
+	assert inrange(`VERBOSE',0, 5)
+	
+	assert inrange(`level',0, 5)
 	assert (`tic'>0) + (`toc'>0)<=1
 
 	if ("`color'"=="") local color text

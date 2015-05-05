@@ -8,14 +8,21 @@ struct MapProblem {
 	struct FixedEffect vector fes	// The G*1 vector of FE structures
 	`Integer'		G 				// Number of FEs when bunching slopes
 	`Varname'		weightvar 		// Name variable contaning the fw/pw/aw
+	`String'		weighttype 		// fw/pw/aw
+	`String'		weights 		// "[weighttype=weightvar]"
 	`Series'		w 				// Contents of variable contaning the fw/pw/aw
-	`Varlist'		clustervars		// Base vars of the clustervars (e.g. x#y z -> x y z) +- just generate the ids
 	`Integer'		verbose			// Number of debug messages to show (0=None, 1=A little, 4=A *lot*)			
 	`Integer'		N				// Number of obs; after map_precompute() the dataset CANNOT CHANGE!
-	`Boolean'		save_ids		// Save categories of absvars
 	`Varlist'		keepvars		// By default we drop cvars and ivars ASAP; this prevents it (useful for clustervars and for timevar+panelvar under HAC errors)
 
 	`Boolean'		will_save_fe	// True if at least one FE will be saved
+
+	`Integer'		C				// Number of cluster variables
+	`Varlist'		clustervars
+	`Varlist'		clustervars_original // Note: need to apply tokens()
+	`Varname'		panelvar
+	`Varname'		timevar
+	`Boolean'		vce_is_hac
 	
 	// Optimization parameters	
 	`Integer'		groupsize 		// Group variables when demeaning (more is faster but uses more memory)

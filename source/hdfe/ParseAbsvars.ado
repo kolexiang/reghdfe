@@ -3,8 +3,6 @@ program define ParseAbsvars, rclass
 syntax anything(id="absvars" name=absvars equalok everything), [SAVEfe] // [CLUSTERvars(varlist numeric fv)]
 	* Logic: split absvars -> expand each into factors -> split each into parts
 
-	di as error "TODO: parse clustervars, return them in an r(); see how it's currently done"
-	
 	local g 0
 	local all_cvars
 	local all_ivars
@@ -67,7 +65,7 @@ syntax anything(id="absvars" name=absvars equalok everything), [SAVEfe] // [CLUS
 		return scalar has_intercept`g' = `has_intercept'
 		return scalar num_slopes`g' = `num_slopes'
 	
-		local label : subinstr local ivars " " "#"
+		local label : subinstr local ivars " " "#", all
 		if (`num_slopes'==1) {
 			local label `label'#c.`cvars'
 		}

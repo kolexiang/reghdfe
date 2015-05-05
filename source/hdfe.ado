@@ -12,14 +12,14 @@ program define hdfe, rclass
 	}
 
 * Parse
-	syntax varlist [if] [in] [fw aw pw/] , ///
+	syntax varlist(numeric) [if] [in] [fw aw pw/] , ///
 	/// Main Options ///
 		Absorb(string) ///
 		[ ///
 		PARTIAL(varlist numeric) /// Additional regressors besides those in absorb()
 		SAMPLE(name) ///
 		Generate(name) CLEAR /// Replace dataset, or just add new variables
-		CLUSTERVARs(string) /// Used to estimate the DoF
+		CLUSTERVARs(varlist numeric fv max=10) /// Used to estimate the DoF
 	/// Optimization ///
 		GROUPsize(string) /// Process variables in groups of #
 		TRANSFORM(string) ///
@@ -34,6 +34,7 @@ program define hdfe, rclass
 	local panelvar `_dta[_TSpanel]'
 
 * Validation
+	local clustervars : subinstr local clustervars "i." "", all // Remove i. prefixes
 	if ("`options'"!="") di as error "unused options: `options'"
 	if ("`sample'"!="") confirm new variable `sample'
 	Assert ("`generate'"!="") + ("`clear'"!="") == 1 , ///
@@ -43,8 +44,7 @@ program define hdfe, rclass
 	if ("`weight'"!="") {
 		local weightvar `exp'
 		local weighttype `weight'
-		local weightequal =
-		confirm var `weightvar' // just allow simple weights
+		confirm var `weightvar', exact // just allow simple weights
 	}
 
 * From now on, we will pollute the Mata workspace, so wrap this in case of error
@@ -53,10 +53,17 @@ program define hdfe, rclass
 * Create Mata structure
 	ParseAbsvars `absorb' // Stores results in r()
 	mata: HDFE_S = map_init() // Reads results from r()
-	local optlist groupsize weightvar transform acceleration verbose tolerance maxiterations
+
+	if ("`weightvar'"!="") mata: map_init_weights(HDFE_S, "`weightvar'", "`weighttype'")
+	* String options
+	local optlist transform acceleration clustervars panelvar timevar
 	foreach opt of local optlist {
-		if ("``opt''"!="") di as error `"mata: map_init_`opt'(HDFE_S, "``opt''")"'
 		if ("``opt''"!="") mata: map_init_`opt'(HDFE_S, "``opt''")
+	}
+	* Numeric options
+	local optlist groupsize verbose tolerance maxiterations
+	foreach opt of local optlist {
+		if ("``opt''"!="") mata: map_init_`opt'(HDFE_S, ``opt'')
 	}
 
 * (Optional) Preserve
@@ -74,10 +81,19 @@ program define hdfe, rclass
 	}
 
 * Precompute Mata objects
+	mata: map_init_keepvars(HDFE_S, "`varlist' `partial' `uid'") // Non-essential vars will be deleted
 	mata: map_precompute(HDFE_S)
+	de
+
+* Compute e(df_a)
+	// EstimateDoF, dofadjustments(pairwise clusters continuous)
 
 * Within Transformation
-	mata: map_solve(HDFE_S, "`varlist'", "`newvars'", "`partial'")
+	//mata: map_solve(HDFE_S, "`varlist'", "`newvars'", "`partial'")
+
+* (Optional) Save FEs
+
+* (Optional) Tempsave, restore and merge with 
 
 * Cleanup after an error
 	} // cap noi
@@ -89,5 +105,8 @@ program define hdfe, rclass
 end
 
 include "common/Assert.ado"
-include "mata/map.mata"
+include "common/Debug.ado"
+include "common/Version.ado"
 include "hdfe/ParseAbsvars.ado"
+include "mata/map.mata"
+include "hdfe/EstimateDoF.ado"

@@ -60,8 +60,7 @@ full_fn = os.path.join(source_path, "mata", fn_mata)
 mata_data = "\r" + open(full_fn, "rb").read()
 includes = re.findall('^\s*include\s+(\S+).mata', mata_data, re.MULTILINE)
 for i, include in enumerate(includes,1):
-    print(len(includes))
-
+ 
     print("    parsing mata include <{}>".format(include), end="")
     full_include = os.path.join(source_path, "mata", include + ".mata")
     include_data = open(full_include, "rb").read()
@@ -112,6 +111,7 @@ for fn in output_filenames:
 
     # Update version
     data = header.format(new_version) + data
+    data = data.replace("VERSION_NUMBER", new_version)
 
     # Save
     new_fn = os.path.join(server_path, fn)

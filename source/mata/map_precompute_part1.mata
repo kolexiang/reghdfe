@@ -4,7 +4,8 @@ void map_precompute_part1(`Problem' S, transmorphic counter) {
 
 	`Integer' G, i, j, n, g, h, i_last_singleton, num_singletons
 	`Boolean' sortedby
-	`Series' singleton, sum_singleton, id, inv_p
+	`Group' id
+	`Series' singleton, sum_singleton, inv_p
 	`Varlist' idvarnames
 	string scalar vartype
 	pointer(`Series') scalar pp // Just to shorten code

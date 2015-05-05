@@ -21,10 +21,12 @@
 	include assert_msg.mata
 	include FixedEffect.mata
 	include MapProblem.mata
+	include map_common.mata
 	include map_init.mata
 	include map_precompute.mata
 	include map_precompute_part1.mata
 	include map_precompute_part2.mata
+	include map_precompute_part3.mata
 	include map_projection.mata
 	include map_solve.mata
 	include map_solve_accelerations.mata

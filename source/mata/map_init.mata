@@ -11,15 +11,19 @@ mata set matastrict on
 	`Varlist'		target
 	pointer(`FE') 	fe
 
-	S.weightvar = ""
+	S.weightvar = S.weighttype = S.weights = ""
 	S.verbose = 0
 	S.transform = "cimmino"
 	S.acceleration = "conjugate_gradient"
 	S.tolerance = 1e-7
 	S.maxiterations = 1e4
 	S.accel_start = 6
-	S.save_ids = 0
 	S.groupsize = 10
+
+	// If clustering by timevar or panelvar and VCE is HAC, we CANNOT touch the clustervars to create compact ids!
+	S.timevar = ""
+	S.panelvar = ""
+	S.vce_is_hac = 0
 
 	// Specific to Aitken:
 	S.accel_freq = 3
@@ -29,6 +33,8 @@ mata set matastrict on
 	S.N = .
 
 	S.G = G = st_numscalar("r(G)")
+	S.C = 0
+	S.clustervars = S.clustervars_original = J(0,0,"")
 	S.fes = FixedEffect(G)
 	S.will_save_fe = 0
 	auto_target = st_numscalar("r(savefe)")
@@ -55,7 +61,6 @@ mata set matastrict on
 		if (basetarget=="" & auto_target) basetarget = sprintf("__hdfe%f__", g)
 		if (basetarget!="") {
 			S.will_save_fe = 1
-			S.save_ids = 1 // We need to save the IDs in order to copy the FEs into the dataset
 			target = J(1, has_intercept + num_slopes, basetarget)
 			if (has_intercept) stata(sprintf("confirm new variable %s", target[1]))
 			for (i=1+has_intercept; i<=length(target); i++) {
@@ -68,20 +73,23 @@ mata set matastrict on
 	return(S)
 }
 
-void function map_init_weightvar(`Problem' S, `Varname' weightvar) {
-	if (weightvar!="") stata(sprintf("confirm numeric variable %s", weightvar))
+void function map_init_clustervars(`Problem' S, `String' clustervars) {
+	S.clustervars = S.clustervars_original = tokens(clustervars)
+	S.C = length(S.clustervars)
+}
+
+void function map_init_weights(`Problem' S, `Varname' weightvar, `String' weighttype) {
+	assert_msg(weightvar!="" & weighttype!="", "map_init_weights() requires weight var and type")
+	stata(sprintf("confirm numeric variable %s, exact", weightvar))
+	assert_msg(anyof(("fweight", "pweight", "aweight"), weighttype), "wrong weight type")
 	S.weightvar = weightvar
+	S.weighttype = weighttype
+	S.weights = sprintf("[%s=%s]", weighttype, weightvar)
 }
 
 void function map_init_keepvars(`Problem' S, `Varname' keepvars) {
 	if (keepvars!="") stata(sprintf("confirm numeric variable %s, exact", keepvars))
 	S.keepvars = tokens(keepvars)
-}
-
-
-void function map_init_save_ids(`Problem' S, `Boolean' save_ids) {
-	assert_msg(save_ids==0 | save_ids==1, "save_ids must be 0 or 1")
-	S.save_ids = save_ids
 }
 
 void function map_init_transform(`Problem' S, `String' transform) {
