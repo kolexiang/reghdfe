@@ -4,8 +4,11 @@ mata set matastrict on
 //  Parse absvars and initialize the almost empty MapProblem struct
 `Problem' function map_init()
 {
-	`Integer'		g, G
+	`Integer'		g, G, num_slopes, has_intercept, i
 	`Problem' 		S
+	`Boolean'		auto_target // Automatically assign target names to all FEs
+	`Varname'		basetarget
+	`Varlist'		target
 	pointer(`FE') 	fe
 
 	S.weightvar = ""
@@ -16,27 +19,51 @@ mata set matastrict on
 	S.maxiterations = 1e4
 	S.accel_start = 6
 	S.save_ids = 0
+	S.groupsize = 10
 
 	// Specific to Aitken:
 	S.accel_freq = 3
 	S.pause_length = 20
 	S.bad_loop_threshold = 1
 	S.stuck_threshold = 5e-3
+	S.N = .
 
 	S.G = G = st_numscalar("r(G)")
 	S.fes = FixedEffect(G)
+	S.will_save_fe = 0
+	auto_target = st_numscalar("r(savefe)")
+	assert(auto_target==1 | auto_target==0)
+	if (auto_target) stata(sprintf("cap drop __hdfe*__*"))
+
 	for (g=1; g<=G; g++) {
 		fe = &(S.fes[g])
 		// recall a->b is the same as (*a).b
+		num_slopes = st_numscalar(sprintf("r(num_slopes%f)",g))
+		has_intercept = st_numscalar(sprintf("r(has_intercept%1.0f)",g))
+
 		fe->order = g
+		fe->num_slopes = num_slopes
+		fe->has_intercept = has_intercept
 		fe->varlabel = st_global(sprintf("r(varlabel%f)",g))
-		fe->num_slopes = st_numscalar(sprintf("r(num_slopes%f)",g))
-		fe->has_intercept = st_numscalar(sprintf("r(has_intercept%1.0f)",g))
 		fe->ivars = tokens(st_global( sprintf("r(ivars%f)",g) ))
 		fe->cvars = tokens(st_global( sprintf("r(cvars%f)",g) ))
-		fe->target = st_global(sprintf("r(target%f)",g))
 		fe->idvarname = sprintf("__ID%f__", g)
 		fe->levels = .
+		fe->target = J(0,0,"")
+		
+		basetarget = st_global(sprintf("r(target%f)",g))
+		if (basetarget=="" & auto_target) basetarget = sprintf("__hdfe%f__", g)
+		if (basetarget!="") {
+			S.will_save_fe = 1
+			S.save_ids = 1 // We need to save the IDs in order to copy the FEs into the dataset
+			target = J(1, has_intercept + num_slopes, basetarget)
+			if (has_intercept) stata(sprintf("confirm new variable %s", target[1]))
+			for (i=1+has_intercept; i<=length(target); i++) {
+				target[i] = target[i] + sprintf("_Slope%f", i-has_intercept)
+				stata(sprintf("confirm new variable %s", target[i]))
+			}
+			fe->target = target
+		}
 	}
 	return(S)
 }
@@ -71,6 +98,11 @@ void function map_init_verbose(`Problem' S, `Integer' verbose) {
 	assert_msg(round(verbose)==verbose, "verbose must be an integer")
 	assert_msg(0<=verbose & verbose<=5, "verbose must be between 0 and 5")
 	S.verbose = verbose
+}
+
+void function map_init_groupsize(`Problem' S, `Integer' groupsize) {
+	assert_msg(round(groupsize)==groupsize & groupsize>0, "groupsize must be a positive integer")
+	S.groupsize = groupsize
 }
 
 void function map_init_acceleration(`Problem' S, `String' acceleration) {

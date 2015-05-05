@@ -7,9 +7,10 @@ mata set matastrict on
 `Group' function accelerate_none(`Problem' S, `Group' y, `FunctionPointer' T) {
 	`Integer'	iter
 	`Group'		resid
+	pragma unset resid
 
 	for (iter=1; iter<=S.maxiterations; iter++) {
-		(*T)(S, y, resid)
+		(*T)(S, y, resid) // Faster version of "resid = S.T(y)"
 		if (check_convergence(S, iter, resid, y)) break
 		y = resid
 	}
@@ -24,16 +25,24 @@ mata set matastrict on
 
 // For discussion on the stopping criteria, see the following presentation:
 // Arioli & Gratton, "Least-squares problems, normal equations, and stopping criteria for the conjugate gradient method". URL: https://www.stfc.ac.uk/SCD/resources/talks/Arioli-NAday2008.pdf
+
 // Basically, we will use the Hestenes and Siefel rule
 
 `Group' function accelerate_cg(`Problem' S, `Group' y, `FunctionPointer' T) {
 	// BUGBUG iterate the first 6? without acceleration??
 	`Integer'	iter, d, Q
 	`Group'		r, u, v
-	real rowvector alpha, beta, ssr, ssr_old, denominator, improvement_potential
-	`Matrix' R, recent_ssr
+	real rowvector alpha, beta, ssr, ssr_old, improvement_potential
+	`Matrix' recent_ssr
+	pragma unset r
+	pragma unset v
+
 	Q = cols(y)
+	
 	d = 1 // BUGBUG Set it to 2/3 // Number of recent SSR values to use for convergence criteria (lower=faster & riskier)
+	// A discussion on the stopping criteria used is described in
+	// http://scicomp.stackexchange.com/questions/582/stopping-criteria-for-iterative-linear-solvers-applied-to-nearly-singular-system/585#585
+
 	improvement_potential = quadcolsum(y :* y)
 	recent_ssr = J(d, Q, .)
 	
@@ -62,15 +71,24 @@ mata set matastrict on
 // -------------------------------------------------------------------------------------------------
 
 `Group' function accelerate_sd(`Problem' S, `Group' y, `FunctionPointer' T) {
-	`Integer'	iter
+	`Integer'	iter, g
 	`Group' proj
-	real rowvector t, denominator
+	real rowvector t
+	pragma unset proj
 
 	for (iter=1; iter<=S.maxiterations; iter++) {
 		(*T)(S, y, proj, 1)
-		t = safe_divide( quadcolsum(y :* proj) , quadcolsum(proj :* proj) )
 		if (check_convergence(S, iter, y-proj, y)) break
+		t = safe_divide( quadcolsum(y :* proj) , quadcolsum(proj :* proj) )
 		y = y - t :* proj
+		
+		if (S.storing_betas) {
+			for (g=1; g<=S.G; g++) {
+				if (length(S.fes[g].target)>0) {
+					S.fes[g].alphas = S.fes[g].alphas + t :* S.fes[g].tmp_alphas
+				}
+			}
+		}
 	}
 	return(y-proj)
 }
@@ -87,11 +105,14 @@ mata set matastrict on
 	`Group'		resid, y_old, delta_sq
 	`Boolean'	accelerate
 	real rowvector t
+	pragma unset resid
 
 	//S.pause_length = 20
 	//S.bad_loop_threshold = 1
 	//S.stuck_threshold = 5e-3
 	// old_error = oldest_error = bad_loop = acceleration_countdown = 0
+
+	y_old = J(rows(y), cols(y), .)
 
 	for (iter=1; iter<=S.maxiterations; iter++) {
 		

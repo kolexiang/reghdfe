@@ -25,7 +25,7 @@
 	include map_precompute.mata
 	include map_precompute_part1.mata
 	include map_precompute_part2.mata
-	include map_project.mata
+	include map_projection.mata
 	include map_solve.mata
 	include map_solve_accelerations.mata
 	include map_solve_transformations.mata

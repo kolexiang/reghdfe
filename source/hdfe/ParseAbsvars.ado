@@ -1,6 +1,6 @@
 capture program drop ParseAbsvars
 program define ParseAbsvars, rclass
-syntax anything(id="absvars" name=absvars equalok everything), [SAVEfe] [CLUSTERvars(varlist numeric fv)]
+syntax anything(id="absvars" name=absvars equalok everything), [SAVEfe] // [CLUSTERvars(varlist numeric fv)]
 	* Logic: split absvars -> expand each into factors -> split each into parts
 
 	di as error "TODO: parse clustervars, return them in an r(); see how it's currently done"

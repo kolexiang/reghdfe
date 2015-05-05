@@ -6,7 +6,6 @@ void map_precompute_part1(`Problem' S, transmorphic counter) {
 	`Boolean' sortedby
 	`Series' singleton, sum_singleton, id, inv_p
 	`Varlist' idvarnames
-	`Varname' ivar
 	string scalar vartype
 	pointer(`Series') scalar pp // Just to shorten code
 
@@ -124,7 +123,7 @@ void map_precompute_part1(`Problem' S, transmorphic counter) {
 `Vector' select_singletons(`Vector' input) {
 	// Code modified from <rows_that_change>
 	`Vector' ans
-	`Integer' i, j, K, N, stepsize
+	`Integer' i, j, N, stepsize
 
 	// Size of blocks of matrices used (larger=faster smaller=less memory)
 	// Benchmarks with 3 unsorted ivars showed 1e4 was fastest, followed by 1e3 and then 1e5

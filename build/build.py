@@ -36,9 +36,14 @@ def zipdir(path, zip):
 
 # Misc
 os.chdir(os.path.split(__file__)[0])
-fn_mata = ur"reghdfe.mata"
+fn_mata = ur"map.mata"
 server_path = u"../package"
 source_path = u"../source"
+
+header = """*! hdfe {}
+*! Sergio Correia (sergio.correia@duke.edu)
+
+"""
 
 # Update version number
 with open(os.path.join(source_path, "version.txt"), 'rb') as fh:
@@ -50,30 +55,32 @@ with open(os.path.join(source_path, "version.txt"), 'rb') as fh:
     print("Version updated from [{}] to [{}]".format(old_version, new_version))
 
 # Append Mata includes
-print("parsing reghdfe.mata")
-full_fn = os.path.join(source_path, "_mata", fn_mata)
+print("parsing map.mata")
+full_fn = os.path.join(source_path, "mata", fn_mata)
 mata_data = "\r" + open(full_fn, "rb").read()
 includes = re.findall('^\s*include\s+(\S+).mata', mata_data, re.MULTILINE)
-for include in includes:
+for i, include in enumerate(includes,1):
+    print(len(includes))
+
     print("    parsing mata include <{}>".format(include), end="")
-    full_include = os.path.join(source_path, "_mata", include + ".mata")
+    full_include = os.path.join(source_path, "mata", include + ".mata")
     include_data = open(full_include, "rb").read()
     print(": {} lines".format(len(include_data.split('\n'))))
     
     mata = re.findall('^\s*mata:\s*$', include_data, re.MULTILINE)
     if (len(mata)>1): print("mata: appears more than once")
     assert len(mata)==1
-    include_data = include_data.replace(mata[0],"")
+    if (i>1): include_data = include_data.replace(mata[0],"")
 
     stricts = re.findall('^\s*mata set matastrict on\s*$', include_data, re.MULTILINE)
     if (len(stricts)>1): print("matastrict appears more than once")
     assert len(stricts)==1
-    include_data = include_data.replace(stricts[0],"")
+    if (i>1): include_data = include_data.replace(stricts[0],"")
 
     ends = re.findall('^\s*end\s*$', include_data, re.MULTILINE)
     if (len(ends)>1): print("end appears more than once")
     assert len(ends)==1
-    include_data = include_data.replace(ends[0],"")
+    if (i<len(includes)): include_data = include_data.replace(ends[0],"")
     mata_data = mata_data.replace(u'include {}.mata'.format(include), '\r\n' + include_data.strip())
 
 # Filenames
@@ -86,9 +93,9 @@ for fn in output_filenames:
     source_data = None
 
     # Add Mata
-    if ("include _mata/reghdfe.mata" in data):
+    if ('include "mata/map.mata"' in data):
         data = data.replace(u"\r\nclear mata", mata_data)
-        data = data.replace(u"\r\ninclude _mata/reghdfe.mata", mata_data)
+        data = data.replace(u'\r\ninclude "mata/map.mata"', mata_data)
 
     # Add other includes
     includes = re.findall('^\s*include "([^"]+)"', data, re.MULTILINE)
@@ -104,7 +111,7 @@ for fn in output_filenames:
         data = data.replace(capdrop, "\n")
 
     # Update version
-    data = data.replace("VERSION_NUMBER", new_version)
+    data = header.format(new_version) + data
 
     # Save
     new_fn = os.path.join(server_path, fn)

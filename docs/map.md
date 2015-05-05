@@ -2,6 +2,16 @@
 
 As shown in e.g. Hernandez-Ramos et al (2011), the least square residuals of a variable *y* with respect to groups of regressors X1, ..., XG, denoted "M" can be achieved either with direct methods (e.g computing `inv(X'X)X'y`) or with iterated methods such as the Method of Alternating Projections (MAP).
 
+Note to ge the least squares problem into a standard linear system form ("Ax=b"), we premultiply by X':
+```
+Xb + e = y
+X'X b + X'e = X'y
+X'X b = X'y - X'e
+Solve for X'X b = X'y
+```
+
+Also, under the least-squares solution, $X'e=0$ and thus $X'Xb = y$
+
 ## Projection Schemes
 
 The authors describe three alternating projections schemes that converge into the joint projection:
@@ -37,4 +47,35 @@ For two sets of fixed effects, the X'X matrix is SDD, and can thus be converted 
 
 Note: See section 9 of Kelner et al (2013) for a parallel of these tools with MAP and Kaczmarz.
 
+
+## Borrar
+
+El conjunto de subespacios M1.. MG, en el caso de los papers de graficos, corresponden a los hiperplanos "Pe"
+donde e pertenece a E\T (ver q es eso)
+
+Tambien, la nocion de "distancia" (cuando la uso en MAP? pa calcular las proyecciones?)
+esta dada por la "resistance norm" ||x||_R := sqrt(x'Rx)
+Eso es solo la raiz de la norma 2 con respecto a R..
+
+Creo que la clave es que el precondicioner esta ligado a un low-stretch spanning tree
+
+En la seccion 10 discuten que su SimpleSolver  es una approximacion al Laplacian pseudoinverse con una "large probability"
+
+Cada iteracion de SimpleSolver es la aplicacion de P_ei a f_i donde e_i  es un "off-tree edge sample"
+
+Pe := I - c_e c_e' R / ||c_e||^2_R
+Eso se parece a I - t P
+
+
+## Tambien (!!!)
+
+Hacer un rand-kaczmarz que sea como kaczmarz pero que randomice cual g usa primero
+(Tambien puedo hacer un rand-sym-kacz?!?!?!?)
+
+
+## WTF
+
+For a spanning tree T rooted at s with n ≥ 2 vertices,
+we can compute a tree decomposition in O(n) time by starting at s and recursively picking the edge
+that leads to the largest subtree. 
 
