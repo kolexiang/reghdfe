@@ -39,7 +39,7 @@ mata set matastrict on
 
 	Q = cols(y)
 	
-	d = 1 // BUGBUG Set it to 2/3 // Number of recent SSR values to use for convergence criteria (lower=faster & riskier)
+	d = 2 // BUGBUG Set it to 2/3 // Number of recent SSR values to use for convergence criteria (lower=faster & riskier)
 	// A discussion on the stopping criteria used is described in
 	// http://scicomp.stackexchange.com/questions/582/stopping-criteria-for-iterative-linear-solvers-applied-to-nearly-singular-system/585#585
 
@@ -80,6 +80,7 @@ mata set matastrict on
 		(*T)(S, y, proj, 1)
 		if (check_convergence(S, iter, y-proj, y)) break
 		t = safe_divide( quadcolsum(y :* proj) , quadcolsum(proj :* proj) )
+		// if (uniform(1,1)<0.1) t = 1 // BUGBUG: Does this help to randomly unstuck an iteration?
 		y = y - t :* proj
 		
 		if (S.storing_betas) {
@@ -129,7 +130,8 @@ mata set matastrict on
 
 		// Only check converge on non-accelerated iterations
 		// BUGBUG: Do we need to disable the check when accelerating?
-		if (check_convergence(S, iter, accelerate? resid :* .  : resid, y)) break
+		// if (check_convergence(S, iter, accelerate? resid :* .  : resid, y)) break
+		if (check_convergence(S, iter, resid, y)) break
 		
 		// Experimental: Pause acceleration
 		//if (accelerate) {
@@ -191,6 +193,7 @@ mata set matastrict on
 			displayflush()
 		}
 		if (S.verbose>=2 & S.verbose<=3 & mod(iter,100)==0) printf("{txt}%9.1f\n", update_error/S.tolerance)
+		if (S.verbose==4) printf("{txt} iter={res}%4.0f{txt}\tupdate_error={res}%-9.6e\n", iter, update_error)
 	}
 	return(done)
 }

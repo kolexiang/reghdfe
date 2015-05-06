@@ -1,51 +1,52 @@
-*! reghdfe VERSION_NUMBER
-*! Sergio Correia (sergio.correia@duke.edu)
-* (built from multiple source files using build.py)
 
-include _mata/reghdfe.mata
+// Mata code is first, then main hdfe.ado, then auxiliary .ado files
+clear mata
+include "mata/map.mata"
 
-cap pr drop reghdfe
+capture program drop reghdfe
 program define reghdfe
-	local version `=clip(`c(version)', 11.2, 13.1)' // 11.2 minimum, 13+ preferred
-	qui version `version'
 
-	* Intercept version calls
+* Set Stata version
+	version `=clip(`c(version)', 11.2, 13.1)' // 11.2 minimum, 13+ preferred
+
+* Intercept version calls
 	cap syntax, version
-	local rc = _rc
-	 if (`rc'==0) {
+	if !c(rc) {
 		Version
 		exit
 	}
 
-	* Intercept multiprocessor/parallel calls
-	cap syntax, instance [*]
-	local rc = _rc
-	 if (`rc'==0) {
-		ParallelInstance, `options'
-		exit
-	}
-
+* Intercept replays
 	if replay() {
 		if (`"`e(cmd)'"'!="reghdfe") error 301
 		Replay `0'
+		exit
 	}
-	else {
-		* Estimate, and then clean up Mata in case of failure
-		mata: st_global("reghdfe_pwd",pwd())
-		Stop // clean leftovers for a possible [break]
-		cap noi Estimate `0'
-		if (_rc) {
-			local rc = _rc
-			Stop
-			exit `rc'
-		}
+
+* Finally, call Estimate
+	cap noi Estimate `0'
+	if (c(rc)) {
+		local rc = c(rc)
+		cap mata: mata drop HDFE_S // overwrites c(rc)
+		exit `rc'
 	}
 end
 
-* Note: Assert and Debug must go first
 include "common/Assert.ado"
 include "common/Debug.ado"
 include "common/Version.ado"
+include "hdfe/ParseAbsvars.ado"
+
+
+
+
+
+
+
+
+
+* UPDATE INCLUDES
+* Note: Assert and Debug must go first
 include "common/SortPreserve.ado"
 
 include "mata/fix_psd.mata"

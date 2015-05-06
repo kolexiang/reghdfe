@@ -1,3 +1,8 @@
+
+// Mata code is first, then main hdfe.ado, then auxiliary .ado files
+clear mata
+include "mata/map.mata"
+
 capture program drop hdfe
 program define hdfe, rclass
 
@@ -29,6 +34,7 @@ program define hdfe, rclass
 		TOLerance(string) ///
 		MAXITerations(string) ///
 		KEEPSINGLETONS(integer 0) /// Only use this option for debugging
+		SUBCMD(string) /// Regression package
 		] [*] // Remaining options 
 
 * Time/panel variables
@@ -55,7 +61,10 @@ program define hdfe, rclass
 
 * Create Mata structure
 	ParseAbsvars `absorb' // Stores results in r()
+	// return list
 	mata: HDFE_S = map_init() // Reads results from r()
+	// return list
+	local save_fe = r(save_fe)
 
 	if ("`weightvar'"!="") mata: map_init_weights(HDFE_S, "`weightvar'", "`weighttype'")
 	* String options
@@ -70,17 +79,19 @@ program define hdfe, rclass
 	}
 
 * (Optional) Preserve
+	if ("`generate'"!="" | `save_fe') {
+		tempvar uid
+		local uid_type = cond(c(N)>c(maxlong), "double", "long")
+		gen `uid_type' `uid' = _n // Useful for later merges
+		la var `uid' "[UID]"
+		preserve
+	}
+
 	if ("`generate'"!="") {
 		foreach var of varlist `varlist' {
 			confirm new var `generate'`var'
 			local newvars `newvars' `generate'`var'
 		}
-		tempvar uid
-		local uid_type = cond(c(N)>c(maxlong), "double", "long")
-		gen `uid_type' `uid' = _n // Useful for later merges
-		la var `uid' "[UID]"
-		
-		preserve
 	}
 
 * Precompute Mata objects
@@ -89,15 +100,62 @@ program define hdfe, rclass
 
 * Compute e(df_a)
 	mata: map_estimate_dof(HDFE_S, "pairwise clusters continuous", "`group'")
+	//return list
 
-	// EstimateDoF, dofadjustments(pairwise clusters continuous)
+* (Optional) Drop IDs, unless i) they are also clusters or ii) we want to save fe
+	// TODO
+
+* (Optional) Need to backup dataset if we want to save FEs
+	if (`save_fe') {
+		tempfile untransformed
+		qui save "`untransformed'"
+	}
 
 * Within Transformation
 	mata: map_solve(HDFE_S, "`varlist'", "`newvars'", "`partial'")
 
-* (Optional) Save FEs
+* Run regression
+	if ("`subcmd'"!="") {
+		// TODO
+		// `subcmd' ..  `varlist' `options' ...
+	}
+	else if (`save_fe') { // Need to regress before predicting
+		regress `varlist', noheader notable // qui  // BUGBUG: _regress?
+	}
 
-* (Optional) Tempsave, restore and merge with 
+* (Optional) Save FEs
+	if (`save_fe') {
+		tempvar resid
+		predict double `resid', resid
+		keep `uid' `resid'
+		tempfile transformed
+		qui save "`transformed'"
+
+		qui use "`untransformed'"
+		erase "`untransformed'"
+
+		merge 1:1 `uid' using "`transformed'", assert(match) nolabel nonotes noreport nogen
+		erase "`transformed'"
+		tempvar resid_d
+		predict double `resid_d', resid
+		if ("`weightvar'"!="") local tmp_weight "[fw=`weightvar']" // summarize doesn't work with pweight
+		su `resid_d' `tmp_weight', mean
+		qui replace `resid_d' = `resid_d' - r(mean)
+		tempvar d
+		gen double `d' = `resid_d' - `resid'
+		//clonevar dd = `d'
+		mata: map_solve(HDFE_S, "`d'", "", "`partial'", 1) // Save FE (should fail if partial is set)
+		//regress dd __hdfe*, nocons
+	}
+
+* (Optional) Tempsave, restore and merge with
+	//if ("`esample'"!="" | `save_fe' | "`generate'"!="")
+	//maso menos xq las variables transformadas ya las chanque (estaban en transformed!)
+	//esta parte es medio rara
+	// ...
+	// need to add vars if i) i want e(sample), ii) i want to merge the FEs, iii) i want to merge
+
+	if ("`generate'"!="" | `save_fe') restore
 
 * Cleanup after an error
 	} // cap noi
@@ -112,5 +170,3 @@ include "common/Assert.ado"
 include "common/Debug.ado"
 include "common/Version.ado"
 include "hdfe/ParseAbsvars.ado"
-include "mata/map.mata"
-include "hdfe/EstimateDoF.ado"

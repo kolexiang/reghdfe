@@ -93,7 +93,7 @@ for fn in output_filenames:
 
     # Add Mata
     if ('include "mata/map.mata"' in data):
-        data = data.replace(u"\r\nclear mata", mata_data)
+        data = data.replace(u"\r\nclear mata", "\r\n")
         data = data.replace(u'\r\ninclude "mata/map.mata"', mata_data)
 
     # Add other includes

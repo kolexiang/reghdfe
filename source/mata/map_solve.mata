@@ -113,16 +113,11 @@ void function map_solve(`Problem' S, `Varlist' vars,
 	st_store(., st_addvar("double", newvars), y :* stdevs)
 
 	// Store FEs
-	if (S.verbose>1) printf("{txt} - Saving fixed effects\n")
 	if (save_fe) {
+		if (S.verbose>1) printf("{txt} - Saving fixed effects\n")
 		for (g=1; g<=S.G; g++) {
 			target = S.fes[g].target
 			if (length(target)>0) {
-				g, rows(S.fes[g].alphas), cols(S.fes[g].alphas)
-				target
-				S.fes[g].alphas :* stdevs
-				rows(st_data(., S.fes.idvarname)) , cols(st_data(., S.fes.idvarname))
-
 				S.fes[g].tmp_alphas = J(0,0,.)
 				st_store(., st_addvar("double", target), S.fes[g].alphas[ st_data(., S.fes[g].idvarname) , . ] :* stdevs)
 			}

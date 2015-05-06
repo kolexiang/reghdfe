@@ -6,7 +6,8 @@ mata set matastrict on
 	`Boolean' 	has_weights, sortedby, has_intercept, storing_betas
 	`Series'	sorted_w
 	`Group'		ans
-	`Vector'	b, tmp_w, tmp_count
+	`Vector'	tmp_w, tmp_count
+	real rowvector b
 	real rowvector ymean // 1*Q
 	real rowvector zero // 1*K
 	`Matrix'	tmp_y, tmp_x
@@ -16,8 +17,6 @@ mata set matastrict on
 	// PROFILE TO SEE IF THIS HELPS OR NOT AT ALL
 	//pointer(`Vector') scalar p_offset
 	//p_offset = &(S.fes[g].offsets)
-
-	timer_on(81)
 
 	has_weights = S.weightvar !=""
 	sortedby = S.fes[g].is_sortedby
@@ -60,16 +59,16 @@ mata set matastrict on
 			}
 		}
 		
-		// BUGBUG if we split this ternary will it be faster?
 		if (storing_betas) {
 			if (has_intercept) S.fes[g].tmp_alphas[j, 1] = ymean
-			if (K>0) S.fes[g].tmp_alphas[j, (has_intercept+1)..(has_intercept+K) ] = b
+			if (K>0) S.fes[g].tmp_alphas[j, (has_intercept+1)..(has_intercept+K) ] = b'
 		}
+
+		// BUGBUG if we split this ternary will it be faster?
 		ans[| i_lower , 1 \ i_upper , . |] = K>0 ? (ymean :+ tmp_x*b) : (ymean :+ J(i_upper-i_lower+1,Q,0))
 		i_lower = i_upper + 1
 	}
 		
-	timer_off(81)
 	return(sortedby ? ans : ans[S.fes[g].inv_p, .])
 }
 end

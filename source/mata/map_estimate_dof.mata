@@ -5,8 +5,8 @@ void map_estimate_dof(`Problem' S, string rowvector adjustments,
 	`Boolean' adj_firstpairs, adj_pairwise, adj_clusters, adj_continuous, belongs, already_first_constant
 	string rowvector all_adjustments
 	`String' adj, label, basestring
-	`Integer' i, g, SuperG, SubGs, h, M_due_to_nested, num_groups, j, m
-	`Vector' M, M_is_exact, is_slope, solved, prev_g
+	`Integer' i, g, SuperG, SubGs, h, M_due_to_nested, num_groups, j, m, sum_levels
+	`Vector' M, M_is_exact, M_is_nested, is_slope, solved, prev_g
 
 	// Parse list of adjustments/tricks to do
 	if (S.verbose>0) printf("{txt}mata: map_estimate_dof()\n")
@@ -50,6 +50,7 @@ void map_estimate_dof(`Problem' S, string rowvector adjustments,
 	// Initialize result vectors and scalars
 	M = J(SuperG, 1, 1)
 	M_is_exact = J(SuperG, 1, 0)
+	M_is_nested = J(SuperG, 1, 0)
 	is_slope = J(SuperG, 1, .)
 	solved = J(SuperG, 1, 0)
 
@@ -77,7 +78,7 @@ void map_estimate_dof(`Problem' S, string rowvector adjustments,
 		for (g=1;g<=S.G;g++) {
 			if (S.fes[g].has_intercept & (S.fes[g].is_clustervar | S.fes[g].in_clustervar)) {
 				M[h] = S.fes[g].levels
-				M_is_exact[h] = 1
+				M_is_exact[h] = M_is_nested[h] = 1
 				M_due_to_nested = M_due_to_nested + M[h]
 				solved[h] = 1
 				if (S.verbose>0 & S.fes[g].is_clustervar) printf("   {txt}(categorical variable {res}%s{txt} is also a cluster variable, so it doesn't count towards DoF)\n", invtokens(S.fes[g].ivars,"#"))
@@ -134,12 +135,23 @@ void map_estimate_dof(`Problem' S, string rowvector adjustments,
 		}
 	}
 
-	// Report final results
+	// Report and return final results
+	st_rclear()
+	st_numscalar("r(M)", sum(M))
+	st_numscalar("r(M_due_to_nested)", M_due_to_nested)
+	sum_levels = 0
+	for (g=1;g<=S.G;g++) sum_levels = sum_levels + S.fes[g].levels * (S.fes[g].has_intercept + S.fes[g].num_slopes)
+	st_numscalar("r(df_a)", sum_levels - sum(M))
+
 	h = 0
 	if (S.verbose>=2) printf("{txt} - Degrees-of-freedom used by each fixed effect (K=total levels; M=redundant levels)\n")
 	for (g=1;g<=S.G;g++) {
 		for (i=1;i<=SubGs[g];i++) {
 			h++
+			st_numscalar(sprintf("r(M%f)",h), M[h])
+			st_numscalar(sprintf("r(M%f_exact)",h), M_is_exact[h])
+			st_numscalar(sprintf("r(M%f_nested)",h), M_is_nested[h])
+			st_numscalar(sprintf("r(K%f)",h), S.fes[g].levels)
 			if (S.verbose>=2) {
 				label = invtokens(S.fes[g].ivars, "#")
 				if (i>S.fes[g].has_intercept) label = label + "#c." + S.fes[g].cvars[i-S.fes[g].has_intercept]
@@ -149,12 +161,9 @@ void map_estimate_dof(`Problem' S, string rowvector adjustments,
 		}
 	}
 
-	// Return M, SumM=Sum(M), kk=Sum(Levels) - Sum(M)
-	// Save mobility group if needed
-	// Return M_due_to_nested
-	// Return saved_group ?? 
-
 }
+
+// -------------------------------------------------------------------------------------------------
 
 `Integer' function count_redundant_cvars(`Problem' S, `Integer' g, `Integer' i) {
 	`Integer' j, i_lower, i_upper, ans, L, ii
