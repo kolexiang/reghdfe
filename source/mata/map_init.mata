@@ -75,7 +75,6 @@ mata set matastrict on
 		}
 	}
 	
-	st_rclear()
 	st_numscalar("r(save_fe)", S.will_save_fe)
 	return(S)
 }

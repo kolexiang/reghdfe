@@ -2,7 +2,7 @@ mata:
 mata set matastrict on
 void map_precompute_part1(`Problem' S, transmorphic counter) {
 
-	`Integer' G, i, j, n, g, h, i_last_singleton, num_singletons
+	`Integer' G, i, j, n, g, h, i_last_singleton, num_singletons, initial_N
 	`Boolean' sortedby
 	`Group' id
 	`Series' singleton, sum_singleton, inv_p
@@ -16,10 +16,12 @@ void map_precompute_part1(`Problem' S, transmorphic counter) {
 	// Give huge warning if keeping singletons
 	if (S.keepsingletons) printf("{err}[WARNING] Singletons are not dropped; statistical significance will be biased\n")
 
+	initial_N = st_nobs()
+
 	// Loop until we stop discovering singletons (and then a bit more to be sure; G-1 to be exact)
 	while (i<i_last_singleton+G) {
 		if (g>G) g = 1
-		if (S.verbose>0) printf("{txt}    - i=%f (g=%f/%f)\t(N=%f)\t", i, g, G, st_nobs())
+		if (S.verbose>1) printf("{txt}    - i=%f (g=%f/%f)\t(N=%f)\t", i, g, G, st_nobs())
 
 		idvarnames = i<=G ? S.fes[g].ivars : S.fes[g].idvarname
 		id = st_data(., idvarnames) // 2% of runtime
@@ -60,7 +62,7 @@ void map_precompute_part1(`Problem' S, transmorphic counter) {
 
 		num_singletons = sum(singleton)
 		if (num_singletons>0) {
-			if (S.verbose>0) printf("{txt}(%f singletons)", num_singletons)
+			if (S.verbose>1) printf("{txt}(%f singletons)", num_singletons)
 			i_last_singleton = i
 
 			// Sort -singleton- as in the dataset, and use it to drop observations
@@ -81,10 +83,12 @@ void map_precompute_part1(`Problem' S, transmorphic counter) {
 			}
 		}
 
-		if (S.verbose>0) printf("{txt}\n")
+		if (S.verbose>1) printf("{txt}\n")
 		i++
 		g++
 	}
+
+	if (S.verbose>0) printf("{txt}    Total singleton obs. dropped: {res}%f{txt}\n", initial_N-st_nobs())
 
 }
 

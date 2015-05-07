@@ -6,7 +6,7 @@ void function map_precompute(`Problem' S) {
 	`Varlist' keepvars, cl_ivars
 	transmorphic counter, loc
 	`Varname' key
-	if (S.verbose>0) printf("{txt}mata: map_precompute()\n")
+	if (S.verbose>0) printf("\n{txt}{bf:mata: map_precompute()}\n")
 
 	// Count how many times each var is used, so we can drop them when the counter reaches zero
 	counter = asarray_create()
@@ -35,20 +35,21 @@ void function map_precompute(`Problem' S) {
 	}
 
 	// Report
+	if (S.verbose>3) printf("{txt}{bf: 0. Usage count of each variable (dropped if it reaches zero)}\n")
 	for (i=1; i<=asarray_elements(counter); i++) {
-		printf("{txt} - key=%s count=%f\n", keepvars[i], asarray(counter,keepvars[i]))
+		if (S.verbose>3) printf("{txt}    - key=%s {col 30}count=%f\n", keepvars[i], asarray(counter,keepvars[i]))
 	}
 
 	// 1. Store permutation vectors and their invorder, generate ID variables, drop singletons
-	if (S.verbose>0) printf("{txt} - 1. Storing permutation vectors, generating ids, dropping singletons\n")
+	if (S.verbose>0) printf("{txt}{bf: 1. Storing permutation vectors, generating ids, dropping singletons}\n")
 	map_precompute_part1(S, counter)
 
 	// 2. Store group offsets, group counters; demeaned(x), inv(xx) if num_slopes>0; weightvars
-	if (S.verbose>0) printf("{txt} - 2. Storing counters and offsets; processing cvars\n")
+	if (S.verbose>0) printf("{txt}{bf: 2. Storing counters and offsets; processing cvars}\n")
 	map_precompute_part2(S, counter)
 
 	// 3. Create cluster IDs, report whether is/in/nested wrt cluster; store precomputed inv(p)
-	if (S.verbose>0) printf("{txt} - 3. Storing reverse permutation vectors, creating cluster IDs\n")
+	if (S.verbose>0) printf("{txt}{bf: 3. Storing reverse permutation vectors, creating cluster IDs}\n")
 	map_precompute_part3(S, counter)
 
 	// 4. Keep only the essential variables
@@ -58,11 +59,11 @@ void function map_precompute(`Problem' S) {
 		value = asarray_contents(counter, loc)
 		if (value>0) keepvars = keepvars, key
 	}
-	if (S.verbose>1) {
-		printf("{txt} - Keeping the following variables\n")
-		keepvars
-	}
+	if (S.verbose>3) printf("{txt}{bf: 4. Keeping the following variables}")
 	st_keepvar(keepvars)
+	// if (S.verbose>3) printf("\n{txt}    %s\n", invtokens(keepvars))
+	if (S.verbose>3) stata("describe _all, numbers")
+	if (S.verbose>3) printf("\n")
 
 	// Store N (todo: add other details) to ensure the dataset doesn't change from now on
 	S.N = st_nobs()

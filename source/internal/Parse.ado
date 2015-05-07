@@ -64,20 +64,20 @@ program define Parse
 		confirm var `weightvar', exact // just allow simple weights
 
 		* Check that weights are correct (e.g. with fweight they need to be integers)
-		local num_type = cond(`require_integer', "integers", "reals")
-		local basenote "weight -`weightvar'- can only contain strictly positive `num_type', but"
+		local num_type = cond("`weight'"=="fweight", "integers", "reals")
+		local basenote "weight {res}`weightvar'{txt} can only contain strictly positive `num_type', but"
 		qui cou if `weightvar'<0
 		Assert (`r(N)'==0), msg("`basenote' `r(N)' negative values were found!")
 		qui cou if `weightvar'==0
-		if (`r(N)'==0), di as text "`basenote' `r(N)' zero values were found (will be dropped)")
+		if (`r(N)'>0) di as text "`basenote' `r(N)' zero values were found (will be dropped)"
 		qui cou if `weightvar'>=.
-		if (`r(N)'==0), di as text "`basenote' `r(N)' missing values were found (will be dropped)")
+		if (`r(N)'>0) di as text "`basenote' `r(N)' missing values were found (will be dropped)"
 		if ("`weight'"=="fweight") {
 			qui cou if mod(`weightvar',1) & `weightvar'<.
 			Assert (`r(N)'==0), msg("`basenote' `r(N)' non-integer values were found!")
 		}
 	}
-	local allkeys `allkeys' `weightvar' `weighttype' `weightexp'
+	local allkeys `allkeys' weightvar weighttype weightexp
 
 * Parse VCE options: (Needs to be BEFORE ParseAbsvars, because of -clustervars-)
 	mata: st_local("hascomma", strofreal(strpos("`vce'", ","))) // is there a commma already in `vce'?
@@ -91,10 +91,9 @@ program define Parse
 
 * Parse Absvars and optimization options
 	ParseAbsvars `absorb' // Stores results in r()
-	// Do I want to keep anything as local and pass it to Estimate??
+	local absorb_keepvars `r(all_ivars)' `r(all_cvars)'
+	local N_hdfe `r(G)'
 	mata: HDFE_S = map_init() // Reads results from r()
-	local absorb_keepvars `all_ivars' `all_cvars'
-	local N_hdfe `G'
 	local allkeys `allkeys' absorb_keepvars N_hdfe
 
 	* Tell Mata what weightvar we have
@@ -139,9 +138,9 @@ program define Parse
 	local allkeys `allkeys' stats summarize_quietly
 
 * Parse over() option
+	local clear = "`clear'"!=""
  	if ("`over'"!="") {
 		unab over : `over', max(1)
-		local clear = "`clear'"!=""
 		Assert (`clear'), msg("over() requires the -clear- option")
 	}
 	local allkeys `allkeys' over clear
@@ -182,12 +181,10 @@ program define Parse
 
 * Return values
 	Debug, level(3) newline
-	Debug, level(3) msg("Parsed options:")
+	Debug, level(3) msg("{title:Parsed options:}")
 	foreach key of local allkeys {
 		if (`"``key''"'!="") Debug, level(3) msg("  `key' = " as result `"``key''"')
 		c_local `key' `"``key''"' // Inject values into caller (reghdfe.ado)
 	}
-	// Debug, level(3) newline
-
 end
 

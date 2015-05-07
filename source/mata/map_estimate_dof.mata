@@ -9,19 +9,20 @@ void map_estimate_dof(`Problem' S, string rowvector adjustments,
 	`Vector' M, M_is_exact, M_is_nested, is_slope, solved, prev_g
 
 	// Parse list of adjustments/tricks to do
-	if (S.verbose>0) printf("{txt}mata: map_estimate_dof()\n")
-	if (S.verbose>0) printf("{txt} - Estimating degrees-of-freedom used by the fixed effects\n")
+	if (S.verbose>1) printf("\n")
+	if (S.verbose>0) printf("{txt}{bf:mata: map_estimate_dof()}\n")
+	if (S.verbose>1) printf("{txt} - Estimating degrees-of-freedom used by the fixed effects\n")
 	all_adjustments = "firstpairs", "pairwise", "clusters", "continuous"
 	adjustments = tokens(adjustments)
 	for (i=1; i<=length(adjustments);i++) {
 		assert_msg(anyof(all_adjustments, adjustments[i]), 
 			sprintf("map_estimate_dof error: adjustment %s invalid", adjustments[i]))
 	}
-	if (S.verbose>0) printf("{txt} - Adjustments:\n")
+	if (S.verbose>1) printf("{txt} - Adjustments:\n")
 	for (i=1;i<=length(all_adjustments);i++) {
 		adj = all_adjustments[i]
 		belongs = anyof(adjustments, adj)
-		if (S.verbose>0) printf("{txt}    - %s:  {col 20}{res} %s\n", adj, belongs ? "yes" : "no")
+		if (S.verbose>1) printf("{txt}    - %s:  {col 20}{res} %s\n", adj, belongs ? "yes" : "no")
 		if (adj=="firstpairs") adj_firstpairs = belongs
 		if (adj=="pairwise") adj_pairwise = belongs
 		if (adj=="clusters") adj_clusters = belongs
@@ -45,7 +46,7 @@ void map_estimate_dof(`Problem' S, string rowvector adjustments,
 		SubGs[g] = S.fes[g].has_intercept + S.fes[g].num_slopes
 	}
 	SuperG = sum(SubGs)
-	if (S.verbose>0) printf("{txt} - There are %f fixed intercepts and slopes in the %f absvars\n", SuperG, S.G)
+	if (S.verbose>1) printf("{txt} - There are %f fixed intercepts and slopes in the %f absvars\n", SuperG, S.G)
 
 	// Initialize result vectors and scalars
 	M = J(SuperG, 1, 1)
@@ -81,8 +82,8 @@ void map_estimate_dof(`Problem' S, string rowvector adjustments,
 				M_is_exact[h] = M_is_nested[h] = 1
 				M_due_to_nested = M_due_to_nested + M[h]
 				solved[h] = 1
-				if (S.verbose>0 & S.fes[g].is_clustervar) printf("   {txt}(categorical variable {res}%s{txt} is also a cluster variable, so it doesn't count towards DoF)\n", invtokens(S.fes[g].ivars,"#"))
-				if (S.verbose>0 & S.fes[g].in_clustervar) printf("   {txt}(categorical variable {res}%s{txt} is nested within cluster {res}%s{txt}, so it doesn't count towards DoF)\n", invtokens(S.fes[g].ivars,"#"), S.clustervars_original[S.fes[g].nesting_clustervar])
+				if (S.verbose>1 & S.fes[g].is_clustervar) printf("   {txt}(categorical variable {res}%s{txt} is also a cluster variable, so it doesn't count towards DoF)\n", invtokens(S.fes[g].ivars,"#"))
+				if (S.verbose>1 & S.fes[g].in_clustervar) printf("   {txt}(categorical variable {res}%s{txt} is nested within cluster {res}%s{txt}, so it doesn't count towards DoF)\n", invtokens(S.fes[g].ivars,"#"), S.clustervars_original[S.fes[g].nesting_clustervar])
 			}
 			h = h + SubGs[g]
 		}
@@ -161,6 +162,7 @@ void map_estimate_dof(`Problem' S, string rowvector adjustments,
 		}
 	}
 
+	if (S.verbose>0) printf(" - Results: N=%f ; K=%f ; M=%f ; (K-M)==df_a=%f\n", S.N, sum_levels, sum(M), sum_levels-sum(M))
 }
 
 // -------------------------------------------------------------------------------------------------

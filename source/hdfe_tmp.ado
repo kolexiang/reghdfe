@@ -165,3 +165,8 @@ s	local optlist groupsize verbose tolerance maxiterations keepsingletons
 		exit `rc'
 	}
 end
+
+include "common/Assert.ado"
+include "common/Debug.ado"
+include "common/Version.ado"
+include "hdfe/ParseAbsvars.ado"

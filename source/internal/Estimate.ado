@@ -9,15 +9,16 @@ program define Estimate, eclass
 	local old_mem = string(r(width) * r(N)  / 2^20, "%6.2f")
 	local RAW_N = c(N)
 	local RAW_K = c(k)
-	mata: verbose2local(HDFE_S, "VERBOSE")
 
 * Parse arguments and create the HDFE_S Mata structure
 	Parse `0' // save all arguments into locals (verbose>=3 shows them)
+	mata: verbose2local(HDFE_S, "VERBOSE")
 
 * (optional) Preserve
 	if (!`clear') {
 		preserve
-		Debug, msg("(dataset preserved)") level(2)
+		Debug, level(2) newline
+		Debug, level(2) msg("(dataset preserved)")
 	}
 
 * (optional) Create uid so we can then attach e(sample) and/or the Zs (the FE coefs.)
@@ -30,21 +31,24 @@ program define Estimate, eclass
 
 * Drop unused variables
 	local exp "= `weightvar'"
+	if ("`weightvar'"!="") la var `weightvar' "[WEIGHT] `: var label `weightvar''" // so we can distinguish it with -describe-
 	marksample touse, novar // Uses -if- , -in- ; -weight-? and -exp- ; can't drop any var until this
 	keep `uid' `touse' `basevars' `timevar' `panelvar' `weightvar' `absorb_keepvars' `clustervars' `over'
 
 * Expand factor and time-series variables
 	local expandedvars
 	local sets depvar indepvars endogvars instruments // depvar MUST be first
+	Debug, level(4) newline
+	Debug, level(4) msg("{title:Expanding factor and time-series variables:}")
 	foreach set of local sets {
 		local varlist ``set''
 		if ("`varlist'"=="") continue
 		local original_`set' `varlist'
 		* the -if- prevents creating dummies for categories that have been excluded
-		ExpandFactorVariables `varlist' if `touse', setname(`set')
+		ExpandFactorVariables `varlist' if `touse', setname(`set') verbose(`VERBOSE')
 		local `set' "`r(varlist)'"
 		local expandedvars `expandedvars' ``set''
-	} 
+	}
 
 * Drop unused basevars and tsset vars (usually no longer needed)
 	if ("`vceextra'"!="") local tsvars `panelvar' `timevar' // We need to keep them only with autoco-robust VCE
@@ -54,7 +58,7 @@ program define Estimate, eclass
 	markout `touse' `expandedvars' `weightvar' `absorb_keepvars' `clustervars'
 	qui keep if `touse'
 	drop `touse'
-	if ("`weightvar'"!="") drop if (`weightvar'==0)
+	if ("`weightvar'"!="") qui drop if (`weightvar'==0)
 	Assert c(N)>0, rc(2000) msg("Empty sample, check for missing values or an always-false if statement")
 
 * Precompute Mata objects
@@ -67,9 +71,10 @@ program define Estimate, eclass
 	qui de, simple
 	local new_mem = string(r(width) * r(N) / 2^20, "%6.2f")
 	Debug, level(2) msg("(dataset compacted, c(memory): " as result "`old_mem'" as text "M -> " as result "`new_mem'" as text "M)")
-	if (`VERBOSE'>=2) {
-		di as text "(memory usage including mata:")
+	if (`VERBOSE'>3) {
+		di as text "(memory usage including mata:)"
 		memory
+		di as text ""
 	}
 
 * Save the statistics we need before transforming the variables

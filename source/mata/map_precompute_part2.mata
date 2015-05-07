@@ -13,7 +13,7 @@ void map_precompute_part2(`Problem' S, transmorphic counter) {
 		sortedby = S.fes[g].is_sortedby
 		K = S.fes[g].num_slopes
 		assert(K==length(S.fes[g].cvars))
-		if (S.verbose>0) printf("{txt}    - g=%f/%f\t\t(K=%f)\n", g, G, K)
+		if (S.verbose>1) printf("{txt}    - g=%f/%f\t\t(K=%f)\n", g, G, K)
 		
 		id = st_data(., S.fes[g].idvarname)
 		if (!sortedby) id = id[S.fes[g].p]

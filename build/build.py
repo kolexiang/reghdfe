@@ -16,7 +16,7 @@ Note: Wrote in Python 2.7 but should work with Python 3.
 from __future__ import print_function
 from __future__ import division
 
-import os, time, re, shutil, zipfile
+import os, time, re, shutil, zipfile, glob
 
 # -------------------------------------------------------------
 # Functions
@@ -34,6 +34,7 @@ def zipdir(path, zip):
 #os.system('C:\Bin\Stata13\StataMP-64.exe /e do "create_html_help"')
 #THIS IS NOT WORKING CORRECTLY.. MAYBE DO IT BY HAND??
 
+
 # Misc
 os.chdir(os.path.split(__file__)[0])
 fn_mata = ur"map.mata"
@@ -44,6 +45,12 @@ header = """*! hdfe {}
 *! Sergio Correia (sergio.correia@duke.edu)
 
 """
+
+# Clear -package- folder
+files = glob.glob(server_path + '/*')
+for f in files:
+    os.remove(f)
+
 
 # Update version number
 with open(os.path.join(source_path, "version.txt"), 'rb') as fh:

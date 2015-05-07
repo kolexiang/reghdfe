@@ -8,18 +8,14 @@
 
 capture program drop ExpandFactorVariables
 program define ExpandFactorVariables, rclass
-syntax varlist(min=1 numeric fv ts) [if] [,setname(string)] [CACHE]
+syntax varlist(min=1 numeric fv ts) [if] [,setname(string)] [CACHE] verbose(integer)
 	
 	* If saving the data for later regressions -savecache(..)- we will need to match each expansion to its newvars
 	* This mata array is used for that
 	* Note: This explains why we need to wrap -fvrevar- in a loop
 	if ("`cache'"!="") mata: varlist_cache = asarray_create()
 
-	* Building the debug message may be slow, only do it if requested with verbose
-	cap mata: st_local("VERBOSE",strofreal(VERBOSE))
-	if ("`VERBOSE'"=="") local VERBOSE 3
-
-	local expanded_msg `"" - variable expansion for `setname': " as result "`varlist'" as text " ->""'
+	local expanded_msg `"" - variable expansion for `setname': {res}`varlist'{txt} ->""'
 	while (1) {
 		gettoken factorvar varlist : varlist, bind
 		if ("`factorvar'"=="") continue, break
@@ -31,7 +27,7 @@ syntax varlist(min=1 numeric fv ts) [if] [,setname(string)] [CACHE]
 			if !r(is_dropped) local contents `contents' `r(varname)'
 			* Yellow=Already existed, White=Created, Red=NotCreated (omitted or base)
 			local color = cond(r(is_dropped), "error", cond(r(is_newvar), "input", "result"))
-			if (`VERBOSE'>3) {
+			if (`verbose'>3) {
 				local expanded_msg `"`expanded_msg' as `color' " `r(name)'" as text " (`r(varname)')""'
 			}
 		}
@@ -40,7 +36,7 @@ syntax varlist(min=1 numeric fv ts) [if] [,setname(string)] [CACHE]
 		local newvarlist `newvarlist' `contents'
 	}
 
-	Debug, level(3) msg(`expanded_msg')
+	Debug, level(4) msg(`expanded_msg')
 	return clear
 	return local varlist "`newvarlist'"
 end
@@ -69,7 +65,7 @@ syntax varname
 		local will_drop = (`is_omitted') | (`is_base' & !`has_cont_interaction')
 		if (!`will_drop') {
 			char `var'[name] `name'
-			la var `var' "[Tempvar] `name'"
+			la var `var' "[TEMPVAR] `name'"
 			local newvar : subinstr local name "." "__", all
 			local newvar : subinstr local newvar "#" "_X_", all
 			* -permname- selects newname# if newname is taken (# is the first number available)
