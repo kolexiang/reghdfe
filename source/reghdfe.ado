@@ -38,6 +38,10 @@ include "common/Version.ado"
 include "hdfe/ParseAbsvars.ado"
 
 
+// ni siquiera necesito el UID en la base despues del restore! bajarmelo nomas
+// es mas, CREAR EL UID JUSTO DESPUES DE PRESERVE!!!!!!!!!!!!!!!!!!!!!
+// luego del restore anhado data asi:
+st_store(uid, st_addvar("float", "x"), x)
 
 
 

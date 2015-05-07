@@ -79,29 +79,8 @@ syntax anything(id="absvars" name=absvars equalok everything), [SAVEfe] // [CLUS
 	local all_ivars : list uniq all_ivars
 	local all_cvars : list uniq all_cvars
 
-
 	return scalar G = `g'
 	return scalar savefe = ("`savefe'"!="")
 	return local all_ivars `all_ivars'
 	return local all_cvars `all_cvars'
-
 end
-
-
-
-/*
-cls
-sysuse auto, clear
-set more off
-set trace off
-local absvars "foreign    rep##c.(weight gear) B=turn (c.gear c.length)#turn#i.foreign trunk#turn length"
-ParseAbsvars `absvars'
-`Integer'	order 			
-`Integer'	num_slopes
-`Integer'	has_intercept
-`Integer'	levels			
-`Varlist'	ivars			
-`Varlist'	cvars			
-`Varname'	varlabel		
-`Varname'	estimates		
-*/

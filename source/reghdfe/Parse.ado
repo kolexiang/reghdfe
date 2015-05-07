@@ -1,216 +1,157 @@
 // -------------------------------------------------------------
 // Parsing and basic sanity checks for REGHDFE.ado
 // -------------------------------------------------------------
-// depvar: dependent variable
-// indepvars: included exogenous regressors
-// endogvars: included endogenous regressors
-// instruments: excluded exogenous regressors
 
 cap pr drop Parse
 program define Parse
 
-* Remove extra spacing from cmdline (just for aesthetics, run before syntax)
-	cap syntax anything(name=indepvars) [if] [in] [fweight aweight pweight/] , SAVEcache(string) [*]
-	local savingcache = (`=_rc'==0)
-
-if (`savingcache') {
-
-	* Disable these options
-	local fast
-	local nested
-
-	syntax anything(name=indepvars) [if] [in] [fweight aweight pweight/] , ///
-		Absorb(string) SAVEcache(string) ///
-		[Verbose(integer 0) CHECK TOLerance(real 1e-7) MAXITerations(real 1e4) noACCELerate ///
-		bad_loop_threshold(integer 1) stuck_threshold(real 5e-3) pause_length(integer 20) ///
-		accel_freq(integer 3) accel_start(integer 6) /// Advanced optimization options
-		CORES(integer 1) OVER(varname numeric) ///
-		DROPSIngletons]
-
-	cap conf file "`savecache'.dta"
-	if (`=_rc'!=0) {
-		cap conf new file "`savecache'.dta"
-		Assert (`=_rc'==0), msg("reghdfe will not be able to save `savecache'.dta")
-	}
-
-}
-else {
+* Remove extra spacing from cmdline (just for aesthetics)
 	mata: st_local("cmdline", stritrim(`"reghdfe `0'"') )
 	ereturn clear // Clear previous results and drops e(sample)
-	syntax anything(id="varlist" name=0 equalok) [if] [in] ///
-		[fweight aweight pweight/] , ///
+
+* Parse the broad syntax (also see map_init(), ParseAbsvars.ado, ParseVCE.ado, etc.)
+	syntax anything(id="varlist" name=0 equalok) [if] [in] [fw aw pw/] , ///
+	/// Main Options ///
 		Absorb(string) ///
-		[VCE(string)] ///
-		[DOFadjustments(string) GROUP(name)] ///
-		[avge(string) EXCLUDESELF] ///
-		[Verbose(integer 0) CHECK NESTED FAST] ///
-		[TOLerance(real 1e-7) MAXITerations(real 1e4) noACCELerate] ///
-		[IVsuite(string) SAVEFIRST FIRST SHOWRAW] /// ESTimator(string)
-		[VCEUNADJUSTED] /// Option when running gmm2s with ivregress
-		[SMALL Hascons TSSCONS] /// ignored options
-		[kiefer] /// excluded
-		[SUBOPTions(string)] /// Options to be passed to the estimation command (e.g . to regress)
-		[bad_loop_threshold(integer 1) stuck_threshold(real 5e-3) pause_length(integer 20) accel_freq(integer 3) accel_start(integer 6)] /// Advanced optimization options
-		[CORES(integer 1)] [USEcache(string)] [OVER(varname numeric)] ///
-		[NOTES(string)] /// NOTES(key=value ..)
-		[STAGEs(string)] ///
-		[DROPSIngletons] ///
-		[ESTimator(string)] /// GMM2s CUE LIML
-		[*] // For display options ; and SUmmarize(stats)
-}
+		[ ///
+		VCE(string) ///
+	/// Seldom Used ///
+		DOFadjustments(string) ///
+		GROUPVAR(name) /// Variable that will contain the first connected group between FEs
+	/// Optimization /// Defaults are handled within Mata		
+		GROUPsize(string) /// Process variables in batches of #
+		TRANSFORM(string) ///
+		ACCELeration(string) ///
+		Verbose(string) ///
+		TOLerance(string) ///
+		MAXITerations(string) ///
+		KEEPSINGLETONS(string) /// (UNDOCUMENTED) Will keep singletons
+		CHECK /// TODO: Implement
+		FAST /// TODO: Implement
+	/// Regression ///
+		ESTimator(string) /// GMM2s CUE LIML
+		IVsuite(string) ///
+		SAVEFIRST ///
+		FIRST ///
+		SHOWRAW ///
+		VCEUNADJUSTED /// (UNDOCUMENTED) Option when running gmm2s with ivregress; will match results of ivreg2
+		SMALL Hascons TSSCONS /// ignored options
+		SUBOPTions(string) /// Options to be passed to the estimation command (e.g . to regress)
+	/// Multiple regressions in one go ///
+		OVER(varname numeric) CLEAR ///
+		NESTED /// TODO: Implement
+		STAGEs(string) ///
+	/// Miscellanea ///
+		NOTES(string) /// NOTES(key=value ..)
+		] [*] // For display options ; and SUmmarize(stats)
 
-* Max iterations (make sure int's integer and not real)
-	local maxiterations = int(`maxiterations')
-	Assert `maxiterations'>0, msg("reghdfe error: maxiterations() must be a positive integer")
+	local allkeys cmdline if in
 
-* Weight
-* We'll have -weight- (fweight|aweight|pweight), -weightvar-, -exp-, and -weightexp-
+* Parse varlist: depvar indepvars (endogvars = iv_vars)
+	ParseIV `0', estimator(`estimator') ivsuite(`ivsuite') `savefirst' `first' `showraw' `vceunadjusted' `small'
+	local keys subcmd model ivsuite estimator depvar indepvars endogvars instruments fe_format ///
+		savefirst first showraw vceunadjusted basevars
+	foreach key of local keys {
+		local `key' "`s(`key')'"
+	}
+	local allkeys `allkeys' `keys'
+
+* Weights
 	if ("`weight'"!="") {
 		local weightvar `exp'
-		conf var `weightvar' // just allow simple weights
+		local weighttype `weight'
 		local weightexp [`weight'=`weightvar']
-		local backupweight `weight'
+		confirm var `weightvar', exact // just allow simple weights
+
+		* Check that weights are correct (e.g. with fweight they need to be integers)
+		local num_type = cond(`require_integer', "integers", "reals")
+		local basenote "weight -`weightvar'- can only contain strictly positive `num_type', but"
+		qui cou if `weightvar'<0
+		Assert (`r(N)'==0), msg("`basenote' `r(N)' negative values were found!")
+		qui cou if `weightvar'==0
+		if (`r(N)'==0), di as text "`basenote' `r(N)' zero values were found (will be dropped)")
+		qui cou if `weightvar'>=.
+		if (`r(N)'==0), di as text "`basenote' `r(N)' missing values were found (will be dropped)")
+		if ("`weight'"=="fweight") {
+			qui cou if mod(`weightvar',1) & `weightvar'<.
+			Assert (`r(N)'==0), msg("`basenote' `r(N)' non-integer values were found!")
+		}
 	}
+	local allkeys `allkeys' `weightvar' `weighttype' `weightexp'
 
-* Cache options
-	if ("`usecache'"!="") {
-		conf file "`usecache'.dta"
-		conf var __uid__
-		Assert ("`avge'"==""), msg("option -avge- not allowed with -usecache-")
-		Assert ("`avge'"==""), msg("option -nested- not allowed with -usecache-")
+* Parse VCE options: (Needs to be BEFORE ParseAbsvars, because of -clustervars-)
+	mata: st_local("hascomma", strofreal(strpos("`vce'", ","))) // is there a commma already in `vce'?
+	if (!`hascomma') local vce `vce' ,
+	ParseVCE `vce' weighttype(`weighttype') // Might call map_init_*()
+	local keys vceoption vcetype vcesuite vceextra num_clusters clustervars bw kernel dkraay twicerobust
+	foreach key of local keys {
+		local `key' "`s(`key')'"
 	}
+	local allkeys `allkeys' `keys'
 
-* Save locals that will be overwritten by later calls to -syntax-
-	local ifopt `if'
-	local inopt `in'
+* Parse Absvars and optimization options
+	ParseAbsvars `absorb' // Stores results in r()
+	// Do I want to keep anything as local and pass it to Estimate??
+	mata: HDFE_S = map_init() // Reads results from r()
+	local absorb_keepvars `all_ivars' `all_cvars'
+	local N_hdfe `G'
+	local allkeys `allkeys' absorb_keepvars N_hdfe
 
-* Parse summarize(..)
+	* Tell Mata what weightvar we have
+	if ("`weightvar'"!="") mata: map_init_weights(HDFE_S, "`weightvar'", "`weighttype'")
+
+	* Time/panel variables (need to give them to Mata)
+	local panelvar `_dta[_TSpanel]'
+	local timevar `_dta[_TStvar]'
+
+	* Parse optimization options (pass them to map_init_*)
+	* String options
+	local optlist transform acceleration clustervars panelvar timevar
+	foreach opt of local optlist {
+		if ("``opt''"!="") mata: map_init_`opt'(HDFE_S, "``opt''")
+	}
+	local allkeys `allkeys' `optlist'
+
+	* Numeric options
+	local optlist groupsize verbose tolerance maxiterations keepsingletons
+	foreach opt of local optlist {
+		if ("``opt''"!="") mata: map_init_`opt'(HDFE_S, ``opt'')
+	}
+	local allkeys `allkeys' `optlist'
+
+	local fast = cond("`fast'"!="", 1, 0) // 1=Yes
+	local allkeys `allkeys' fast
+
+* DoF Adjustments
+	if ("`dofadjustments'"=="") local dofadjustments all
+	ParseDOF , `dofadjustments'
+	local dofadjustments "`s(dofadjustments)'"
+	* Mobility groups
+	if ("`groupvar'"!="") conf new var `groupvar'
+	local allkeys `allkeys' dofadjustments groupvar
+
+* Parse summarize option: [summarize | summarize( stats... [,QUIetly])]
+	* Note: ParseImplicit deals with "implicit" options and fills their default values
 	local default_stats mean min max
 	ParseImplicit, opt(SUmmarize) default(`default_stats') input(`options') syntax([namelist(name=stats)] , [QUIetly]) inject(stats quietly)
 	local summarize_quietly = ("`quietly'"!="")
 	if ("`stats'"=="" & "`quietly'"!="") local stats `default_stats'
+	local allkeys `allkeys' stats summarize_quietly
 
-* Coef Table Options
-if (!`savingcache') {
-	_get_diopts diopts options, `options'
-	Assert `"`options'"'=="", msg(`"invalid options: `options'"')
-	if ("`hascons'`tsscons'"!="") di in ye "(option `hascons'`tsscons' ignored)"
-}
-
-* Over
-	if ("`over'"!="") {
+* Parse over() option
+ 	if ("`over'"!="") {
 		unab over : `over', max(1)
-		Assert ("`usecache'"!="" | "`savecache'"!=""), msg("-over- needs to be used together with either -usecache- or -savecache-")
+		local clear = "`clear'"!=""
+		Assert (`clear'), msg("over() requires the -clear- option")
 	}
+	local allkeys `allkeys' over clear
 
-* Verbose
-	assert inlist(`verbose', 0, 1, 2, 3, 4) // 3 and 4 are developer options
-	mata: VERBOSE = `verbose' // Ugly hack to avoid using a -global-
-
-* Show raw output of called subcommand (e.g. ivreg2)
-	local showraw = ("`showraw'"!="")
-	
-* If true, will use wmatrix(...) vce(unadjusted) instead of the default of setting vce contents equal to wmatrix
-* This basically undoes the extra adjustment that ivregress does, so it's comparable with ivreg2
-*
-* Note: Cannot match exactly the -ivregress- results without vceunadjusted (see test-gmm.do)
-* Thus, I will set this to true ALWAYS
-	local vceunadjusted = 1 // ("`vceunadjusted'"!="")
-
-* tsset variables, if any
-	cap conf var `_dta[_TStvar]'
-	if (!_rc) local timevar `_dta[_TStvar]'
-	cap conf var `_dta[_TSpanel]'
-	if (!_rc) local panelvar `_dta[_TSpanel]'
-
-* Model settings
-if (!`savingcache') {
-
-	// local model = cond(strpos(`"`0'"', " ("), "iv", "ols") // Fails with long strs in stata 12<
-	local model ols
-	foreach _ of local 0 {
-		if (substr(`"`_'"', 1, 1)=="(") {
-			local model iv
-			continue, break
-		}
+* Nested
+	local nested = cond("`nested'"!="", 1, 0) // 1=Yes
+	if (`nested' & !("`model'"=="ols" & "`vcetype'"=="unadjusted") ) {
+		Debug, level(0) msg("(option nested ignored, only works with OLS and conventional/unadjusted VCE)") color("error")
 	}
-	
-	* Estimator
-	if ("`estimator'"!="") {
-		Assert "`model'"=="iv", msg("reghdfe error: estimator() requires an instrumental-variable regression")
-	
-		if (substr("`estimator'", 1, 3)=="gmm") local estimator gmm2s
-
-		Assert inlist("`estimator'", "2sls", "gmm2s", "liml", "cue"), msg("reghdfe error: invalid estimator `estimator'")
-		if (inlist("`estimator'", "cue")) Assert "`ivsuite'"!="ivregress", msg("reghdfe error: estimator `estimator' only available with the ivreg2 command, you selected ivregress")
-	}
-	else {
-		local estimator 2sls
-	}
-
-	* For this, _iv_parse would have been useful, although I don't want to do factor expansions when parsing
-	if ("`model'"=="iv") {
-
-		* get part before parentheses
-		local wrongparens 1
-		while (`wrongparens') {
-			gettoken tmp 0 : 0 ,p("(")
-			local left `left'`tmp'
-			* Avoid matching the parens of e.g. L(-1/2) and L.(var1 var2)
-			* Using Mata to avoid regexm() and trim() space limitations
-			mata: st_local("tmp1", subinstr("`0'", " ", "") ) // wrong parens if ( and then a number
-			mata: st_local("tmp2", substr(strtrim("`left'"), -1) ) // wrong parens if dot
-			local wrongparens = regexm("`tmp1'", "^\([0-9-]") | ("`tmp2'"==".")
-			if (`wrongparens') {
-				gettoken tmp 0 : 0 ,p(")")
-				local left `left'`tmp'
-			}
-		}
-
-		* get part in parentheses
-		gettoken right 0 : 0 ,bind match(parens)
-		Assert trim(`"`0'"')=="" , msg("error: remaining argument: `0'")
-
-		* now parse part in parentheses
-		gettoken endogvars instruments : right ,p("=")
-		gettoken equalsign instruments : instruments ,p("=")
-
-		Assert "`endogvars'"!="", msg("iv: endogvars required")
-		local 0 `endogvars'
-		syntax varlist(fv ts numeric)
-		local endogvars `varlist'
-
-		Assert "`instruments'"!="", msg("iv: instruments required")
-		local 0 `instruments'
-		syntax varlist(fv ts numeric)
-		local instruments `varlist'
-		
-		local 0 `left' // So OLS part can handle it
-		Assert "`endogvars'`instruments'"!=""
-		
-		if ("`ivsuite'"=="") local ivsuite ivreg2
-		Assert inlist("`ivsuite'","ivreg2","ivregress") , msg("error: wrong IV routine (`ivsuite'), valid options are -ivreg2- and -ivregress-")
-		cap findfile `ivsuite'.ado
-		Assert !_rc , msg("error: -`ivsuite'- not installed, please run {stata ssc install `ivsuite'} or change the option -ivsuite-")
-	}
-
-* OLS varlist
-	syntax varlist(fv ts numeric)
-	gettoken depvar indepvars : varlist
-	_fv_check_depvar `depvar'
-
-* Extract format of depvar so we can format FEs like this
-	fvrevar `depvar', list
-	local fe_format : format `r(varlist)' // The format of the FEs and AvgEs that will be saved
-
-* Variables shouldn't be repeated
-* This is not perfect (e.g. doesn't deal with "x1-x10") but still helpful
-	local allvars `depvar' `indepvars' `endogvars' `instruments'
-	local dupvars : list dups allvars
-	Assert "`dupvars'"=="", msg("error: there are repeated variables: <`dupvars'>")
-
-	Debug, msg(_n " {title:REGHDFE} Verbose level = `verbose'")
-	*Debug, msg("{hline 64}")
+	local allkeys `allkeys' nested
 
 * Stages
 	assert "`model'"!="" // just to be sure this goes after `model' is set
@@ -222,221 +163,31 @@ if (!`savingcache') {
 	if ("`stages'"!="") {
 		Assert "`model'"=="iv", msg("Error, stages() only valid with an IV regression")
 		local stages `stages' `iv_stage' // Put -iv- *last* (so it does the -restore-; note that we don't need it first to trim MVs b/c that's done earlier)
-		Assert "`avge'"=="", msg("Error, avge not allowed with stages()")
 	}
 	else {
 		local stages none // So we can loop over stages
 	}
+	local allkeys `allkeys' stages
 
-* Parse VCE options:
-	
-	* Note: bw=1 *usually* means just do HC instead of HAC
-	* BUGBUG: It is not correct to ignore the case with "bw(1) kernel(Truncated)"
-	* but it's too messy to add -if-s everywhere just for this rare case (see also Mark Schaffer's email)
+* Parse Coef Table Options (do this last!)
+	_get_diopts diopts options, `options' // store in `diopts', and the rest back to `options'
+	Assert `"`options'"'=="", msg(`"invalid options: `options'"')
+	if ("`hascons'`tsscons'"!="") di in ye "(option `hascons'`tsscons' ignored)"
+	local allkeys `allkeys' diopts
 
-	local 0 `vce'
-	syntax [anything(id="VCE type")] , [bw(integer 1)] [KERnel(string)] [dkraay(integer 1)] [kiefer] ///
-		[suite(string) TWICErobust]
-	if ("`anything'"=="") local anything unadjusted
-	Assert `bw'>0, msg("VCE bandwidth must be a positive integer")
-	gettoken vcetype clustervars : anything
-	* Expand variable abbreviations; but this adds unwanted i. prefixes
-	if ("`clustervars'"!="") {
-		fvunab clustervars : `clustervars'
-		local clustervars : subinstr local clustervars "i." "", all
-	}
 
-	* vcetype abbreviations:
-	if (substr("`vcetype'",1,3)=="ols") local vcetype unadjusted
-	if (substr("`vcetype'",1,2)=="un") local vcetype unadjusted
-	if (substr("`vcetype'",1,1)=="r") local vcetype robust
-	if (substr("`vcetype'",1,2)=="cl") local vcetype cluster
-	if ("`vcetype'"=="conventional") local vcetype unadjusted // Conventional is the name given in e.g. xtreg
-	Assert strpos("`vcetype'",",")==0, msg("Unexpected contents of VCE: <`vcetype'> has a comma")
-
-	* Sanity checks on vcetype
-	if ("`vcetype'"=="" & "`backupweight'"=="pweight") local vcetype robust
-	Assert !("`vcetype'"=="unadjusted" & "`backupweight'"=="pweight"), msg("pweights do not work with unadjusted errors, use a different vce()")
-	if ("`vcetype'"=="") local vcetype unadjusted
-	Assert inlist("`vcetype'", "unadjusted", "robust", "cluster"), msg("VCE type not supported: `vcetype'")
-
-	* Cluster vars
-	local num_clusters : word count `clustervars'
-	Assert inlist( (`num_clusters'>0) + ("`vcetype'"=="cluster") , 0 , 2), msg("Can't specify cluster without clustervars and viceversa") // XOR
-
-	* VCE Suite
-	local vcesuite `suite'
-	if ("`vcesuite'"=="") local vcesuite default
-	if ("`vcesuite'"=="default") {
-		if (`bw'>1 | `dkraay'>1 | "`kiefer'"!="" | "`kernel'"!="") {
-			local vcesuite avar
-		}
-		else if (`num_clusters'>1) {
-			local vcesuite mwc
-		}
-	}
-
-	Assert inlist("`vcesuite'", "default", "mwc", "avar"), msg("Wrong vce suite: `vcesuite'")
-
-	if ("`vcesuite'"=="mwc") {
-		cap findfile tuples.ado
-		Assert !_rc , msg("error: -tuples- not installed, please run {stata ssc install tuples} to estimate multi-way clusters.")
-	}
-	
-	if ("`vcesuite'"=="avar" | "`stages'"!="none") {
-		cap findfile avar.ado // We use -avar- as default with stages (on the non-iv stages)
-		Assert !_rc , msg("error: -avar- not installed, please run {stata ssc install avar} or change the option -vcesuite-")
-	}
-
-	* Some combinations are not coded
-	Assert !("`ivsuite'"=="ivregress" & (`num_clusters'>1 | `bw'>1 | `dkraay'>1 | "`kiefer'"!="" | "`kernel'"!="") ), msg("option vce(`vce') incompatible with ivregress")
-	Assert !("`ivsuite'"=="ivreg2" & (`num_clusters'>2) ), msg("ivreg2 doesn't allow more than two cluster variables")
-	Assert !("`model'"=="ols" & "`vcesuite'"=="avar" & (`num_clusters'>2) ), msg("avar doesn't allow more than two cluster variables")
-	Assert !("`model'"=="ols" & "`vcesuite'"=="default" & (`bw'>1 | `dkraay'>1 | "`kiefer'"!="" | "`kernel'"!="") ), msg("to use those vce options you need to use -avar- as the vce suite")
-	if (`num_clusters'>0) local temp_clustervars " <CLUSTERVARS>"
-	if (`bw'==1 & `dkraay'==1 & "`kernel'"!="") local kernel // No point in setting kernel here 
-	if (`bw'>1 | "`kernel'"!="") local vceextra `vceextra' bw(`bw') 
-	if (`dkraay'>1) local vceextra `vceextra' dkraay(`dkraay') 
-	if ("`kiefer'"!="") local vceextra `vceextra' kiefer 
-	if ("`kernel'"!="") local vceextra `vceextra' kernel(`kernel')
-	if ("`vceextra'"!="") local vceextra , `vceextra'
-	local vceoption "`vcetype'`temp_clustervars'`vceextra'" // this excludes "vce(", only has the contents
-
-* DoF Adjustments
-	if ("`dofadjustments'"=="") local dofadjustments all
-	local 0 , `dofadjustments'
-	syntax, [ALL NONE] [PAIRwise FIRSTpair] [CLusters] [CONTinuous]
-	opts_exclusive "`all' `none'" dofadjustments
-	opts_exclusive "`pairwise' `firstpair'" dofadjustments
-	if ("`none'"!="") {
-		Assert "`pairwise'`firstpair'`clusters'`continuous'"=="", msg("option {bf:dofadjustments()} invalid; {bf:none} not allowed with other alternatives")
-		local dofadjustments
-	}
-	if ("`all'"!="") {
-		Assert "`pairwise'`firstpair'`clusters'`continuous'"=="", msg("option {bf:dofadjustments()} invalid; {bf:all} not allowed with other alternatives")
-		local dofadjustments pairwise clusters continuous
-	}
-	else {
-		local dofadjustments `pairwise' `firstpair' `clusters' `continuous'
-	}
-
-* Mobility groups
-	if ("`group'"!="") conf new var `group'
-
-* IV options
-	if ("`small'"!="") di in ye "(note: reghdfe will always use the option -small-, no need to specify it)"
-
-	if ("`model'"=="iv") {
-		local savefirst = ("`savefirst'"!="")
-		local first = ("`first'"!="")
-		if (`savefirst') Assert `first', msg("Option -savefirst- requires -first-")
-	}
-
-} // End of !`savingcache'
-
-* Optimization
-	if (`maxiterations'==0) local maxiterations 1e8
-	Assert (`maxiterations'>0)
-	local accelerate = cond("`accelerate'"!="", 0, 1) // 1=Yes
-	local check = cond("`check'"!="", 1, 0) // 1=Yes
-	local fast = cond("`fast'"!="", 1, 0) // 1=Yes
-	local tolerance = strofreal(`tolerance', "%9.1e") // Purely esthetic
-	Assert `cores'<=32 & `cores'>0 , msg("At most 32 cores supported")
-	if (`cores'>1) {
-		cap findfile parallel.ado
-		Assert !_rc , msg("error: -parallel- not installed, please run {stata ssc install parallel}")
-	}
-	local opt_list tolerance maxiterations check accelerate ///
-		bad_loop_threshold stuck_threshold pause_length accel_freq accel_start
-	foreach opt of local opt_list {
-		if ("``opt''"!="") local maximize_options `maximize_options' `opt'(``opt'')
-	}
-
-* Varnames underlying tsvars and fvvars (e.g. i.foo L(1/3).bar -> foo bar)
-	foreach vars in depvar indepvars endogvars instruments {
-		if ("``vars''"!="") {
-			fvrevar ``vars'' , list
-			local basevars `basevars' `r(varlist)'
-		}
-	}
-
-if (!`savingcache') {
-* Nested
-	local nested = cond("`nested'"!="", 1, 0) // 1=Yes
-	if (`nested' & !("`model'"=="ols" & "`vcetype'"=="unadjusted") ) {
-		Debug, level(0) msg("(option nested ignored, only works with OLS and conventional/unadjusted VCE)") color("error")
-	}
-
-* How can we do the same regression from a standard stata command?
-* (useful for benchmarking and testing correctness of results)
-	local subcmd = cond("`model'"=="ols" ,"regress", "`ivsuite'")
-
-* _fv_check_depvar overwrites the local -weight-
-	local weight `backupweight'
-	Assert inlist( ("`weight'"!="") + ("`weightvar'"!="") + ("`weightexp'"!="") , 0 , 3 ) , msg("not all 3 weight locals are set")
+* Other keys:
+	local allkeys `allkeys' suboptions notes
+	// Missing keys: check
 
 * Return values
-	local names cmdline diopts model ///
-		ivsuite showraw vceunadjusted ///
-		depvar indepvars endogvars instruments savefirst first ///
-		vceoption vcetype vcesuite vceextra num_clusters clustervars bw kernel dkraay /// vceextra
-		dofadjustments ///
-		if in group check fast nested fe_format ///
-		tolerance maxiterations accelerate maximize_options ///
-		subcmd suboptions ///
-		absorb avge excludeself ///
-		timevar panelvar basevars ///
-		weight weightvar exp weightexp /// type of weight (fw,aw,pw), weight var., and full expr. ([fw=n])
-		cores savingcache usecache over ///
-		stats summarize_quietly notes stages ///
-		dropsingletons estimator twicerobust
-}
-
-if (`savingcache') {
-	local names maximize_options cores if in timevar panelvar indepvars basevars ///
-		absorb savecache savingcache fast nested check over ///
-		weight weightvar exp weightexp /// type of weight (fw,aw), weight var., and full expr. ([fw=n])
-		tolerance maxiterations /// Here just used for -verbose- and cache handshake purposes
-		dropsingletons
-}
-
-	local if `ifopt'
-	local in `inopt'
-
 	Debug, level(3) newline
 	Debug, level(3) msg("Parsed options:")
-	foreach name of local names {
-		if (`"``name''"'!="") Debug, level(3) msg("  `name' = " as result `"``name''"')
-		c_local `name' `"``name''"' // Inject values into caller (reghdfe.ado)
+	foreach key of local allkeys {
+		if (`"``key''"'!="") Debug, level(3) msg("  `key' = " as result `"``key''"')
+		c_local `key' `"``key''"' // Inject values into caller (reghdfe.ado)
 	}
 	// Debug, level(3) newline
+
 end
 
-capture program drop ParseImplicit
-program define ParseImplicit
-* Parse options in the form NAME|NAME(arguments)
-* Inject: what locals to inject (depend on -syntax)
-* Default: default value for implicit form
-* XOR: opt is mandatory (one of the two versions)
-	syntax, opt(name local) default(string) syntax(string asis) [input(string asis)] inject(namelist local) [XOR]
-
-	* First see if the implicit version is possible
-	local lower_opt = lower("`opt'")
-	local 0 , `input'
-	cap syntax, `opt' [*]
-	if ("`xor'"=="") local capture capture
-	local rc = _rc
-	if (`rc') {
-		`capture' syntax, `opt'(string asis) [*]
-		if ("`capture'"!="" & _rc) exit
-	}
-	else {
-		local `lower_opt' `default'
-	}
-	local 0 ``lower_opt''
-	syntax `syntax'
-	foreach loc of local inject {
-		c_local `loc' ``loc''
-	}
-	c_local options `options'
-end

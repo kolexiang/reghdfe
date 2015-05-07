@@ -1,3 +1,4 @@
+OBSOLETE
 cap pr drop ParseOneAbsvar
 program define ParseOneAbsvar, rclass
 	syntax, ABSVAR(string)

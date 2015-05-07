@@ -147,4 +147,9 @@ void function map_init_keepsingletons(`Problem' S, `Boolean' keepsingletons) {
 	S.keepsingletons = keepsingletons
 }
 
+void function map_init_vce_is_hac(`Problem' S, `Boolean' vce_is_hac) {
+	assert_msg(vce_is_hac==0 | vce_is_hac==1, "vce_is_hac must be 0 or 1")
+	S.vce_is_hac = vce_is_hac
+}
+
 end

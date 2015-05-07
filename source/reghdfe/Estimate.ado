@@ -4,78 +4,38 @@
 cap pr drop Estimate
 program define Estimate, eclass
 
-/* Notation of created variables
-	__FE1__        		Fixed effect categories
-	__Z1__         		Fixed effect coefficients (estimates)
-	__clustervar1__		Categories for the clusters that had to be generated
-	__W1__         		AvgE transformed variables (avg of depvar by category)
-*/
-
-// PART I - PREPARE DATASET FOR REGRESSION
-
-* 1) Parse main options
-	Parse `0' // save all arguments into locals (verbose>=3 shows them)
-	local sets depvar indepvars endogvars instruments // depvar MUST be first
-
-* 2) Parse identifiers (absorb variables, avge, clustervar)
-	Start, absorb(`absorb') over(`over') avge(`avge') clustervars(`clustervars') weight(`weight') weightvar(`weightvar')
-	* Note: In this step, it doesn't matter if the weight is FW or AW
-	local N_hdfe = r(N_hdfe)
-	local N_avge = r(N_avge)
+* (reporting) Store dataset size
+	qui de, simple
+	local old_mem = string(r(width) * r(N)  / 2^20, "%6.2f")
 	local RAW_N = c(N)
 	local RAW_K = c(k)
-	local absorb_keepvars = r(keepvars) // Vars used in hdfe,avge,cluster
-	
-	qui de, simple
-	local old_mem = string(r(width) * r(N)  / 2^20, "%6.2f") // This is just for debugging; measured in MBs
+	mata: verbose2local(HDFE_S, "VERBOSE")
 
-* 3) Preserve
-if ("`usecache'"!="") {
-	local uid __uid__
-	if ("`over'"!="") {
-		gettoken ifword ifexp : if
-		expr_query `ifexp'
-		local vars_in_if = r(varnames)
-		Assert `: list over in vars_in_if', msg("Error: since you are using over(`over'), you need to include {it:`over'}=={it:value} to your -if- condition.")
-		
-		cap local regex = regexm("`if'", "(^| )`over'==([0-9.e-]+)")
-		Assert `regex', rc(0) msg("Warning: {it:`over'}=={it:value} not found in -if- (perhaps was abbreviated); e(over_value) and e(over_label) will not be stored.")
-		cap local over_value = regexs(2)
-		cap local over_label : label (__uid__) `over_value'
-	}
-}
-else {
-	tempvar uid
-	local uid_type = cond(`RAW_N'>c(maxlong), "double", "long")
-	gen `uid_type' `uid' = _n // Useful for later merges
-	la var `uid' "[UID]" // So I can recognize it in -describe-
-}
+* Parse arguments and create the HDFE_S Mata structure
+	Parse `0' // save all arguments into locals (verbose>=3 shows them)
 
-	if (`savingcache') {
-		cap drop __uid__
-		rename `uid' __uid__
-		local uid __uid__
-		local handshake = int(uniform()*1e8)
-		char __uid__[handshake] `handshake'
-		char __uid__[tolerance] `tolerance'
-		char __uid__[maxiterations] `maxiterations'
-		if ("`over'"!="") {
-			local label : value label `over'
-			label value __uid__ `label', nofix // Trick, attach label to __uid__
-		}
+* (optional) Preserve
+	if (!`clear') {
+		preserve
+		Debug, msg("(dataset preserved)") level(2)
 	}
 
-	preserve
-	Debug, msg("(dataset preserved)") level(2)
+* (optional) Create uid so we can then attach e(sample) and/or the Zs (the FE coefs.)
+	if (!`clear' & !`fast') {
+		tempvar uid
+		local uid_type = cond(c(N)>c(maxlong), "double", "long")
+		gen `uid_type' `uid' = _n // Useful for later merges
+		la var `uid' "[UID]"
+	}
 
-* 4) Drop unused variables
-	if ("`vceextra'"!="") local tsvars `panelvar' `timevar' // We need to keep these when using an autoco-robust VCE
+* Drop unused variables
 	local exp "= `weightvar'"
 	marksample touse, novar // Uses -if- , -in- ; -weight-? and -exp- ; can't drop any var until this
-	keep `uid' `touse' `timevar' `panelvar' `absorb_keepvars' `basevars' `over' `weightvar' `tsvars'
+	keep `uid' `touse' `basevars' `timevar' `panelvar' `weightvar' `absorb_keepvars' `clustervars' `over'
 
-* 5) Expand factor and time-series variables (this *must* happen before precompute is called!)
+* Expand factor and time-series variables
 	local expandedvars
+	local sets depvar indepvars endogvars instruments // depvar MUST be first
 	foreach set of local sets {
 		local varlist ``set''
 		if ("`varlist'"=="") continue
@@ -86,59 +46,38 @@ else {
 		local expandedvars `expandedvars' ``set''
 	} 
 
-* 6) Drop unused basevars and tsset vars (usually no longer needed)
-	keep `uid' `touse' `absorb_keepvars' `expandedvars' `over' `weightvar' `tsvars'
+* Drop unused basevars and tsset vars (usually no longer needed)
+	if ("`vceextra'"!="") local tsvars `panelvar' `timevar' // We need to keep them only with autoco-robust VCE
+	keep `uid' `touse' `expandedvars' `weightvar' `absorb_keepvars' `clustervars' `tsvars' `over' 
 
-* 7) Drop all observations with missing values (before creating the FE ids!)
-	markout `touse' `expandedvars'
-	markout `touse' `expandedvars' `absorb_keepvars'
+* Drop excluded observations and observations with missing values
+	markout `touse' `expandedvars' `weightvar' `absorb_keepvars' `clustervars'
 	qui keep if `touse'
-	if ("`dropsingletons'"!="") DropSingletons, num_absvars(`N_hdfe')
-	Assert c(N)>0, rc(2000) msg("Empty sample, check for missing values or an always-false if statement")
 	drop `touse'
-	if ("`over'"!="" & `savingcache') qui levelsof `over', local(over_levels)
+	if ("`weightvar'"!="") drop if (`weightvar'==0)
+	Assert c(N)>0, rc(2000) msg("Empty sample, check for missing values or an always-false if statement")
 
-* 8) Fill Mata structures, create FE identifiers, avge vars and clustervars if needed
-	Precompute, keep(`uid' `expandedvars' `tsvars') depvar("`depvar'") `excludeself' tsvars(`tsvars') over(`over') dofadjustments(`dofadjustments')
+* Precompute Mata objects
+	mata: map_init_keepvars(HDFE_S, "`expandedvars' `uid'") // Non-essential vars will be deleted
+	* Note: This is kinda redundant with the -keep- above except if a variable is somehow a cvar
+	mata: map_precompute(HDFE_S)
+
+* (reporting) memory usage demeanings
 	Debug, level(2) msg("(dataset compacted: observations " as result "`RAW_N' -> `c(N)'" as text " ; variables " as result "`RAW_K' -> `c(k)'" as text ")")
-	local avgevars = cond("`avge'"=="", "", "__W*__")
-	local vars `expandedvars' `avgevars'
-
-	* qui compress `expandedvars' // will recast to -double- later on
 	qui de, simple
 	local new_mem = string(r(width) * r(N) / 2^20, "%6.2f")
 	Debug, level(2) msg("(dataset compacted, c(memory): " as result "`old_mem'" as text "M -> " as result "`new_mem'" as text "M)")
-
-* 9) Check that weights have acceptable values
-if ("`weightvar'"!="") {
-	local require_integer = ("`weight'"=="fweight")
-	local num_type = cond(`require_integer', "integers", "reals")
-
-	local basenote "weight -`weightvar'- can only contain strictly positive `num_type', but"
-	qui cou if `weightvar'<0
-	Assert (`r(N)'==0), msg("`basenote' `r(N)' negative values were found!")
-	qui cou if `weightvar'==0
-	Assert (`r(N)'==0), msg("`basenote' `r(N)' zero values were found!")
-	qui cou if `weightvar'>=.
-	Assert (`r(N)'==0), msg("`basenote' `r(N)' missing values were found!")
-	if (`require_integer') {
-		qui cou if mod(`weightvar',1)
-		Assert (`r(N)'==0), msg("`basenote' `r(N)' non-integer values were found!")
+	if (`VERBOSE'>=2) {
+		di as text "(memory usage including mata:")
+		memory
 	}
-}
 
-* 10) Save the statistics we need before transforming the variables
-if (`savingcache') {
-	cap drop __FE*__
-	cap drop __clustervar*__
-}
-else {
+* Save the statistics we need before transforming the variables
 	* Compute TSS of untransformed depvar
 	local tmpweightexp = subinstr("`weightexp'", "[pweight=", "[aweight=", 1)
 	qui su `depvar' `tmpweightexp' // BUGBUG: Is this correct?!
 	local tss = r(Var)*(r(N)-1)
 	assert `tss'<.
-
 	if (`: list posof "first" in stages') {
 		foreach var of varlist `endogvars' {
 			qui su `var' `tmpweightexp' // BUGBUG: Is this correct?!
@@ -146,20 +85,14 @@ else {
 		}
 	}
 
-* 11) Calculate the degrees of freedom lost due to the FEs
-	if ("`group'"!="") {
-		tempfile groupdta
-		local opt group(`group') groupdta(`groupdta') uid(`uid')
-	}
-	EstimateDoF, dofadjustments(`dofadjustments') `opt'
-	local kk = r(kk) // FEs that were not found to be redundant (= total FEs - redundant FEs)
+* Compute e(df_a)
+	mata: map_estimate_dof(HDFE_S, "`dofadjustments'", "`groupvar'")
+	TODO: SAVE GROUPVAR IN HDFE_S AND WAIT UNTIL RESTORE TO PUT IT BACK IN THE DTA
 	local M = r(M) // FEs found to be redundant
-	local saved_group = r(saved_group)
 	local M_due_to_nested = r(M_due_to_nested)
-
+	local kk = r(df_a) // FEs that were not found to be redundant (total FEs - redundant FEs)
 	Assert `kk'<.
 	Assert `M'>=0 & `M'<.
-	assert inlist(`saved_group', 0, 1)
 
 	forv g=1/`N_hdfe' {
 		local M`g' = r(M`g')
@@ -171,18 +104,26 @@ else {
 		assert `M`g''<. & `K`g''<.
 		assert `M`g''>=0 & `K`g''>=0
 		assert inlist(r(drop`g'), 0, 1)
-
-		* Drop IDs for the absorbed FEs (except if its the clustervar)
-		* Useful b/c regr. w/cluster takes a lot of memory
-		if (r(drop`g')==1) drop __FE`g'__
 	}
 
-	if (`num_clusters'>0) {
-		mata: st_local("temp_clustervars", invtokens(clustervars))
-		local vceoption : subinstr local vceoption "<CLUSTERVARS>" "`temp_clustervars'"
-	}
+* Drop IDs for the absorbed FEs (except if its the clustervar)
+* This is useful because the demeaning takes a lot of memory
+	TODO: Make this a MATA call that checks whether fes[g].is_clustervar and also fes[g].target
 
-}
+* Replace vceoption with the correct cluster names (e.g. if it's a FE or a new variable)
+	TODO
+	//if (`num_clusters'>0) {
+	//	mata: st_local("temp_clustervars", invtokens(clustervars))
+	//	local vceoption : subinstr local vceoption "<CLUSTERVARS>" "`temp_clustervars'"
+	//}
+
+
+
+
+
+asdasdasdasd
+
+
 
 * 12) Save untransformed data.
 *	This allows us to:
