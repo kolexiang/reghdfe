@@ -1,7 +1,6 @@
 cap pr drop Wrapper_regress
 program define Wrapper_regress, eclass
 	syntax , depvar(varname) [indepvars(varlist) avgevars(varlist)] ///
-		original_absvars(string) original_depvar(string) [original_indepvars(string) avge_targets(string)] ///
 		vceoption(string asis) ///
 		kk(integer) ///
 		[weightexp(string)] ///
@@ -101,6 +100,4 @@ program define Wrapper_regress, eclass
 		ereturn scalar df_m = 0
 		ereturn scalar rank = 0 // Not adding constant anymore
 	}
-
-	mata: st_local("original_vars", strtrim(stritrim( "`original_depvar' `original_indepvars' `avge_targets' `original_absvars'" )) )
 end

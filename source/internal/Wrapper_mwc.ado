@@ -2,7 +2,6 @@ capture program drop Wrapper_mwc
 program define Wrapper_mwc, eclass
 * This will compute an ols regression with 2+ clusters
 syntax , depvar(varname) [indepvars(varlist) avgevars(varlist)] ///
-	original_absvars(string) original_depvar(string) [original_indepvars(string) avge_targets(string)] ///
 	vceoption(string asis) ///
 	kk(integer) ///
 	[weightexp(string)] ///
@@ -149,8 +148,5 @@ syntax , depvar(varname) [indepvars(varlist) avgevars(varlist)] ///
 		ereturn df_m = 0
 		ereturn scalar rank = 0 // Not adding constant anymore
 	}
-
-* ereturns specific to this command
-	mata: st_local("original_vars", strtrim(stritrim( "`original_depvar' `original_indepvars' `avge_targets' `original_absvars'" )) )
 
 end

@@ -20,12 +20,12 @@ program define Parse
 		GROUPVAR(name) /// Variable that will contain the first connected group between FEs
 	/// Optimization /// Defaults are handled within Mata		
 		GROUPsize(string) /// Process variables in batches of #
-		TRANSFORM(string) ///
+		TRAnsform(string) ///
 		ACCELeration(string) ///
 		Verbose(string) ///
 		TOLerance(string) ///
 		MAXITerations(string) ///
-		KEEPSINGLETONS(string) /// (UNDOCUMENTED) Will keep singletons
+		KEEPSINgletons /// (UNDOCUMENTED) Will keep singletons
 		CHECK /// TODO: Implement
 		FAST /// TODO: Implement
 	/// Regression ///
@@ -86,8 +86,10 @@ program define Parse
 
 	mata: HDFE_S = map_init() // Reads results from r()
 		local will_save_fe = `r(will_save_fe)' // Returned from map_init()
+		local original_absvars = "`r(original_absvars)'"
+		local extended_absvars = "`r(extended_absvars)'"
 	
-	local allkeys `allkeys' absorb_keepvars N_hdfe will_save_fe
+	local allkeys `allkeys' absorb_keepvars N_hdfe will_save_fe original_absvars extended_absvars
 
 	* Tell Mata what weightvar we have
 	if ("`weightvar'"!="") mata: map_init_weights(HDFE_S, "`weightvar'", "`weighttype'")
@@ -105,6 +107,7 @@ program define Parse
 	local allkeys `allkeys' `optlist'
 
 	* Numeric options
+	local keepsingletons = ("`keepsingletons'"!="")
 	local optlist groupsize verbose tolerance maxiterations keepsingletons
 	foreach opt of local optlist {
 		if ("``opt''"!="") mata: map_init_`opt'(HDFE_S, ``opt'')

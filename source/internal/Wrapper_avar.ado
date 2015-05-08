@@ -1,7 +1,6 @@
 cap pr drop Wrapper_avar
 program define Wrapper_avar, eclass
 	syntax , depvar(varname) [indepvars(varlist) avgevars(varlist)] ///
-		original_absvars(string) original_depvar(string) [original_indepvars(string) avge_targets(string)] ///
 		vceoption(string asis) ///
 		kk(integer) ///
 		[weightexp(string)] ///
@@ -142,7 +141,4 @@ program define Wrapper_avar, eclass
 		ereturn df_m = 0
 		ereturn scalar rank = 0 // Not adding constant anymore
 	}
-	
-* ereturns specific to this command
-	mata: st_local("original_vars", strtrim(stritrim( "`original_depvar' `original_indepvars' `avge_targets' `original_absvars'" )) )
 end

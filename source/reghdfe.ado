@@ -44,6 +44,20 @@ include "internal/Estimate.ado"
 		include "internal/ParseAbsvars.ado"
 		include "internal/ParseDOF.ado"
 		include "internal/ParseImplicit.ado"
+	
 	include "internal/ExpandFactorVariables.ado"
+	
+	include "internal/Wrapper_regress.ado"
+	include "internal/Wrapper_avar.ado"
+	include "internal/Wrapper_mwc.ado"
+	include "internal/Wrapper_ivregress.ado"
+	include "internal/Wrapper_ivreg2.ado"
+
+	include "internal/FixVarnames.ado"
+	include "internal/Attach.ado"
+	include "internal/Subtitle.ado"
+// -------------------------------------------------------------------------------------------------
+include "internal/Replay.ado"
+	include "internal/Header.ado"
 // -------------------------------------------------------------------------------------------------
 

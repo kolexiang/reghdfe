@@ -5,8 +5,8 @@ void map_estimate_dof(`Problem' S, string rowvector adjustments,
 	`Boolean' adj_firstpairs, adj_pairwise, adj_clusters, adj_continuous, belongs, already_first_constant
 	string rowvector all_adjustments
 	`String' adj, label, basestring
-	`Integer' i, g, SuperG, SubGs, h, M_due_to_nested, j, m, sum_levels
-	`Vector' M, M_is_exact, M_is_nested, is_slope, solved, prev_g
+	`Integer' i, g, SuperG, h, M_due_to_nested, j, m, sum_levels
+	`Vector' M, M_is_exact, M_is_nested, is_slope, solved, prev_g, SubGs
 
 	// Parse list of adjustments/tricks to do
 	if (S.verbose>1) printf("\n")
@@ -150,6 +150,7 @@ void map_estimate_dof(`Problem' S, string rowvector adjustments,
 		for (i=1;i<=SubGs[g];i++) {
 			h++
 			st_numscalar(sprintf("r(M%f)",h), M[h])
+			st_numscalar(sprintf("r(G%f)",h), g)
 			st_numscalar(sprintf("r(M%f_exact)",h), M_is_exact[h])
 			st_numscalar(sprintf("r(M%f_nested)",h), M_is_nested[h])
 			st_numscalar(sprintf("r(K%f)",h), S.fes[g].levels)
@@ -161,6 +162,7 @@ void map_estimate_dof(`Problem' S, string rowvector adjustments,
 			}
 		}
 	}
+	st_numscalar("r(N_hdfe_extended)", SuperG)
 
 	if (S.verbose>0) printf(" - Results: N=%f ; K=%f ; M=%f ; (K-M)==df_a=%f\n", S.N, sum_levels, sum(M), sum_levels-sum(M))
 }

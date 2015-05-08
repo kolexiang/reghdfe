@@ -18,6 +18,10 @@ void function store_uid(`Problem' S, `Varname' varname) {
 	assert_msg(rows(S.uid)==S.N, "assertion failed: rows(S.uid)==S.N")
 }
 
+void function drop_uid(`Problem' S) {
+	S.uid = J(0,0,.)
+}
+
 void function groupvar2dta(`Problem' S) {
 	if (S.groupvar!="") {
 		if (S.verbose>2) printf("{txt}    - Saving identifier for the first mobility group: {res}%s\n", S.groupvar)
@@ -35,8 +39,33 @@ void function groupvar2dta(`Problem' S) {
 void function drop_ids(`Problem' S) {
 	`Integer' g
 	for (g=1;g<=S.G;g++) {
-		if (!S.fes[g].is_clustervar) st_dropvar(S.fes[g].idvarname)
+		if (!S.fes[g].is_clustervar & S.fes[g].target=="") st_dropvar(S.fes[g].idvarname)
 	}
 }
 
+void function esample2dta(`Problem' S, `Varname' esample) {
+	assert(length(S.uid)>0)
+	st_store(S.uid, st_addvar("byte", esample), J(rows(S.uid),1,1) )
+}
+
+// Copy the fixed effect estimates (the alphas back into the original dataset)
+void function alphas2dta(`Problem' S) {
+	`Integer' g, i
+	`Varlist' target
+	`String' varlabel
+	assert(S.will_save_fe==1)
+	if (S.verbose>1) printf("{txt}    - Storing fixed effects in the original dataset\n", S.groupvar)
+	for (g=1; g<=S.G; g++) {
+		target = S.fes[g].target
+		if (length(target)>0) {
+			st_store(S.uid, st_addvar("double", target), S.fes[g].alphas)
+			S.fes[g].alphas = J(0,0,0)
+			for (i=1; i<=length(target);i++) {
+				varlabel = invtokens(S.fes[g].ivars, "#")
+				if (i>1 | !S.fes[g].has_intercept) varlabel = varlabel + "#c." + S.fes[g].cvars[i-S.fes[g].has_intercept]
+				st_varlabel(target[i], sprintf("[FE] %s", varlabel))
+			}
+		}
+	}
+}
 end

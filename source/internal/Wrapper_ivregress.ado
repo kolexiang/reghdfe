@@ -2,8 +2,6 @@ cap pr drop Wrapper_ivregress
 program define Wrapper_ivregress, eclass
 	syntax , depvar(varname) endogvars(varlist) instruments(varlist) ///
 		[indepvars(varlist) avgevars(varlist)] ///
-		original_depvar(string) original_endogvars(string) original_instruments(string) ///
-		[original_indepvars(string) avge_targets(string)] ///
 		vceoption(string asis) ///
 		KK(integer) ///
 		[weightexp(string)] ///
@@ -78,7 +76,6 @@ program define Wrapper_ivregress, eclass
 	if ("`clustervars'"=="") ereturn scalar df_r = `CorrectDoF'
 
 	* ereturns specific to this command
-	mata: st_local("original_vars", strtrim(stritrim( "`original_depvar' `original_indepvars' `avge_targets' `original_absvars' (`original_endogvars'=`original_instruments')" )) )
 	ereturn scalar F = e(F) * `CorrectDoF' / `WrongDoF'
 
 	ereturn scalar tss = e(mss) + e(rss) // ivreg2 doesn't report e(tss)

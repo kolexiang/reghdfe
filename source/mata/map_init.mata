@@ -8,7 +8,7 @@ mata set matastrict on
 	`Problem' 		S
 	`Boolean'		auto_target // Automatically assign target names to all FEs
 	`Varname'		basetarget
-	`Varlist'		target
+	`Varlist'		target, original_absvars, extended_absvars
 	pointer(`FE') 	fe
 
 	S.weightvar = S.weighttype = S.weights = ""
@@ -44,6 +44,8 @@ mata set matastrict on
 	assert(auto_target==1 | auto_target==0)
 	if (auto_target) stata(sprintf("cap drop __hdfe*__*"))
 
+	original_absvars = extended_absvars = J(1, G, "")
+
 	for (g=1; g<=G; g++) {
 		fe = &(S.fes[g])
 		// recall a->b is the same as (*a).b
@@ -62,7 +64,15 @@ mata set matastrict on
 		fe->is_clustervar = 0
 		fe->in_clustervar = 0
 		fe->nesting_clustervar = .
-		
+
+		extended_absvars[g] = original_absvars[g] = invtokens(fe->ivars, "#")
+		if (num_slopes>0) {
+			original_absvars[g] = original_absvars[g] + (has_intercept ? "##c." : "#c.")
+			original_absvars[g] = original_absvars[g] + (num_slopes==1 ? (fe->cvars) : "("+invtokens(fe->cvars)+")")
+			
+			extended_absvars[g] = (has_intercept ? extended_absvars[g] + " " : "") + invtokens(extended_absvars[g] + "#c." :+ (fe->cvars))
+		}
+			
 		basetarget = st_global(sprintf("r(target%f)",g))
 		if (basetarget=="" & auto_target) basetarget = sprintf("__hdfe%f__", g)
 		if (basetarget!="") {
@@ -78,6 +88,8 @@ mata set matastrict on
 	}
 	
 	st_numscalar("r(will_save_fe)", S.will_save_fe)
+	st_global("r(original_absvars)", invtokens(original_absvars) )
+	st_global("r(extended_absvars)", invtokens(extended_absvars) )
 	return(S)
 }
 

@@ -9,7 +9,7 @@ void function map_solve(`Problem' S, `Varlist' vars,
 	real rowvector stdevs
 	`Varlist'	target
 
-	if (S.verbose>0) printf("{txt}mata: map_solve()\n")
+	if (S.verbose>0) printf("{txt}{bf:mata: map_solve()}\n")
 	assert_msg(S.N!=., "map_solve() needs to be run after map_precompute()")
 	assert_msg(S.N==st_nobs(), "dataset cannot change after map_precompute()")
 
@@ -68,7 +68,7 @@ void function map_solve(`Problem' S, `Varlist' vars,
 	// Luego bajo y asi que me quedo con y + ..
 	// Contar cuantos vectores creo en los aceleradores y en los proyectores
 
-	if (S.verbose>0) printf("{txt} - Solving problem (acceleration={res}%s{txt}, transform={res}%s{txt})\n", save_fe ? "steepest_descent" : S.acceleration, save_fe ? "kaczmarz" : S.transform)
+	if (S.verbose>0) printf("{txt} - Solving problem (acceleration={res}%s{txt}, transform={res}%s{txt} tol={res}%-1.0e{txt} poolsize={res}%f{txt} varsize={res}%f{txt})\n", save_fe ? "steepest_descent" : S.acceleration, save_fe ? "kaczmarz" : S.transform, S.tolerance, S.groupsize, cols(y))
 
 	// Warnings
 	if (S.transform=="kaczmarz" & S.acceleration=="conjugate_gradient") {
@@ -119,11 +119,10 @@ void function map_solve(`Problem' S, `Varlist' vars,
 			target = S.fes[g].target
 			if (length(target)>0) {
 				S.fes[g].tmp_alphas = J(0,0,.)
-				st_store(., st_addvar("double", target), S.fes[g].alphas[ st_data(., S.fes[g].idvarname) , . ] :* stdevs)
+				S.fes[g].alphas = S.fes[g].alphas[ st_data(., S.fes[g].idvarname) , . ] :* stdevs
 			}
 		}
 	}
 
 }
-
 end

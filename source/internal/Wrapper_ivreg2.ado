@@ -2,9 +2,6 @@ cap pr drop Wrapper_ivreg2
 program define Wrapper_ivreg2, eclass
 	syntax , depvar(varname) endogvars(varlist) instruments(varlist) ///
 		[indepvars(varlist) avgevars(varlist)] ///
-		original_depvar(string) original_endogvars(string) original_instruments(string) ///
-		[original_indepvars(string) avge_targets(string)] ///
-		[original_absvars(string) avge_targets] ///
 		vceoption(string asis) ///
 		KK(integer) ///
 		[SHOWRAW(integer 0)] first(integer) [weightexp(string)] ///
@@ -98,7 +95,4 @@ program define Wrapper_ivreg2, eclass
 		estimates drop `hold'
 
 	}
-
-	* ereturns specific to this command
-	mata: st_local("original_vars", strtrim(stritrim( "`original_depvar' `original_indepvars' `avge_targets' `original_absvars' (`original_endogvars'=`original_instruments')" )) )
 end
