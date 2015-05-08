@@ -5,7 +5,7 @@ void map_estimate_dof(`Problem' S, string rowvector adjustments,
 	`Boolean' adj_firstpairs, adj_pairwise, adj_clusters, adj_continuous, belongs, already_first_constant
 	string rowvector all_adjustments
 	`String' adj, label, basestring
-	`Integer' i, g, SuperG, SubGs, h, M_due_to_nested, num_groups, j, m, sum_levels
+	`Integer' i, g, SuperG, SubGs, h, M_due_to_nested, j, m, sum_levels
 	`Vector' M, M_is_exact, M_is_nested, is_slope, solved, prev_g
 
 	// Parse list of adjustments/tricks to do

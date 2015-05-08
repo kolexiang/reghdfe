@@ -66,6 +66,12 @@ program define Estimate, eclass
 	* Note: This is kinda redundant with the -keep- above except if a variable is somehow a cvar
 	mata: map_precompute(HDFE_S)
 
+* Replace vceoption with the correct cluster names (e.g. if it's a FE or a new variable)
+	if (`num_clusters'>0) {
+		assert "`r(updated_clustervars)'"!=""
+		local vceoption : subinstr local vceoption "<CLUSTERVARS>" "`r(updated_clustervars)'"
+	}
+
 * (reporting) memory usage demeanings
 	Debug, level(2) msg("(dataset compacted: observations " as result "`RAW_N' -> `c(N)'" as text " ; variables " as result "`RAW_K' -> `c(k)'" as text ")")
 	qui de, simple
@@ -91,8 +97,9 @@ program define Estimate, eclass
 	}
 
 * Compute e(df_a)
+	if (!`fast') mata: store_uid(HDFE_S, "`uid'")
 	mata: map_estimate_dof(HDFE_S, "`dofadjustments'", "`groupvar'")
-	TODO: SAVE GROUPVAR IN HDFE_S AND WAIT UNTIL RESTORE TO PUT IT BACK IN THE DTA
+
 	local M = r(M) // FEs found to be redundant
 	local M_due_to_nested = r(M_due_to_nested)
 	local kk = r(df_a) // FEs that were not found to be redundant (total FEs - redundant FEs)
@@ -108,26 +115,29 @@ program define Estimate, eclass
 		assert inlist(`M`g'_exact',0,1) // 1 or 0 whether M`g' was calculated exactly or not
 		assert `M`g''<. & `K`g''<.
 		assert `M`g''>=0 & `K`g''>=0
-		assert inlist(r(drop`g'), 0, 1)
 	}
 
-* Drop IDs for the absorbed FEs (except if its the clustervar)
-* This is useful because the demeaning takes a lot of memory
-	TODO: Make this a MATA call that checks whether fes[g].is_clustervar and also fes[g].target
-
-* Replace vceoption with the correct cluster names (e.g. if it's a FE or a new variable)
-	TODO
-	//if (`num_clusters'>0) {
-	//	mata: st_local("temp_clustervars", invtokens(clustervars))
-	//	local vceoption : subinstr local vceoption "<CLUSTERVARS>" "`temp_clustervars'"
-	//}
+* Drop the fixed effect IDs (except if they are also a clustervar, which we need!)
+	mata: drop_ids(HDFE_S) 
 
 
 
 
 
-asdasdasdasd
 
+
+
+
+* (optional) Restore
+	if (!`clear') {
+		restore
+		Debug, level(2) newline
+		Debug, level(2) msg("(dataset restored)")
+		if ("`groupvar'"!="") mata: groupvar2dta(HDFE_S)
+	}
+
+
+stopit
 
 
 * 12) Save untransformed data.

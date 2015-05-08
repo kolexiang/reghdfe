@@ -6,10 +6,10 @@ mata set matastrict on
 	`Series' group, p
 	`Integer' gg, g, j, i_lower, i_upper, num_groups, L
 	real rowvector min_max
-	`String' vartype
 
 	changed = 1
 	group = st_data(., S.fes[g1].idvarname)
+	if (args()<4) groupvar = ""
 	
 	while (changed) {
 		changed = 0
@@ -37,12 +37,12 @@ mata set matastrict on
 	_collate(group, invorder(p))
 	
 	// (optional) save group variable
-	if (groupvar!="") {
-		vartype = num_groups<=100 ? "byte" : (num_groups<=32740? "int" : "long")
-		st_store(., st_addvar(vartype, groupvar), group)
-		if (S.verbose>2) printf("{txt}    - Saving identifier for the first mobility group: {res}%s\n", groupvar)
-		st_varlabel(groupvar, sprintf("Mobility Group: %s <--> %s", invtokens(S.fes[g1].ivars,"#") , invtokens(S.fes[g2].ivars,"#")))
-	}
+	// Don't save until back in the main dataset!
+	S.groupvar = groupvar
+	S.grouptype = num_groups<=100 ? "byte" : (num_groups<=32740? "int" : "long")
+	S.grouplabel = sprintf("Mobility Group: %s <--> %s", invtokens(S.fes[g1].ivars,"#") , invtokens(S.fes[g2].ivars,"#"))
+	S.groupseries = group
 	return(num_groups)
 }
+
 end

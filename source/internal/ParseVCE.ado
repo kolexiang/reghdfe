@@ -74,8 +74,6 @@ program define ParseVCE, sclass
 	if ("`vceextra'"!="") local vceextra , `vceextra'
 	local vceoption "`vcetype'`temp_clustervars'`vceextra'" // this excludes "vce(", only has the contents
 
-	if ("`vceextra'"!="") mata: map_init_vce_is_hac(HDFE_S, 1)
-
 	local keys vceoption vcetype vcesuite vceextra num_clusters clustervars bw kernel dkraay twicerobust
 	foreach key of local keys {
 		sreturn local `key' ``key''

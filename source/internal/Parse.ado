@@ -79,22 +79,15 @@ program define Parse
 	}
 	local allkeys `allkeys' weightvar weighttype weightexp
 
-* Parse VCE options: (Needs to be BEFORE ParseAbsvars, because of -clustervars-)
-	mata: st_local("hascomma", strofreal(strpos("`vce'", ","))) // is there a commma already in `vce'?
-	if (!`hascomma') local vce `vce' ,
-	ParseVCE `vce' weighttype(`weighttype') // Might call map_init_*()
-	local keys vceoption vcetype vcesuite vceextra num_clusters clustervars bw kernel dkraay twicerobust
-	foreach key of local keys {
-		local `key' "`s(`key')'"
-	}
-	local allkeys `allkeys' `keys'
-
 * Parse Absvars and optimization options
 	ParseAbsvars `absorb' // Stores results in r()
-	local absorb_keepvars `r(all_ivars)' `r(all_cvars)'
-	local N_hdfe `r(G)'
+		local absorb_keepvars `r(all_ivars)' `r(all_cvars)'
+		local N_hdfe `r(G)'
+
 	mata: HDFE_S = map_init() // Reads results from r()
-	local allkeys `allkeys' absorb_keepvars N_hdfe
+		local will_save_fe = `r(will_save_fe)' // Returned from map_init()
+	
+	local allkeys `allkeys' absorb_keepvars N_hdfe will_save_fe
 
 	* Tell Mata what weightvar we have
 	if ("`weightvar'"!="") mata: map_init_weights(HDFE_S, "`weightvar'", "`weighttype'")
@@ -105,7 +98,7 @@ program define Parse
 
 	* Parse optimization options (pass them to map_init_*)
 	* String options
-	local optlist transform acceleration clustervars panelvar timevar
+	local optlist transform acceleration panelvar timevar
 	foreach opt of local optlist {
 		if ("``opt''"!="") mata: map_init_`opt'(HDFE_S, "``opt''")
 	}
@@ -119,7 +112,27 @@ program define Parse
 	local allkeys `allkeys' `optlist'
 
 	local fast = cond("`fast'"!="", 1, 0) // 1=Yes
+	* Fast precludes i) saving FE, ii) running predict, iii) saving groupvar
+	if (`fast' & ("`groupvar'"!="" | `will_save_fe'==1)) {
+		di as error "(warning: option -fast- not allowed when saving FEs or mobility groups; disabled)"
+		local fast 0
+	}
+
 	local allkeys `allkeys' fast
+
+* Parse VCE options
+	mata: st_local("hascomma", strofreal(strpos("`vce'", ","))) // is there a commma already in `vce'?
+	if (!`hascomma') local vce `vce' ,
+	ParseVCE `vce' weighttype(`weighttype')
+	local keys vceoption vcetype vcesuite vceextra num_clusters clustervars bw kernel dkraay twicerobust
+	foreach key of local keys {
+		local `key' "`s(`key')'"
+	}
+	local allkeys `allkeys' `keys'
+	
+	* Update Mata
+	if ("`clustervars'"!="") mata: map_init_clustervars(HDFE_S, "`clustervars'")
+	if ("`vceextra'"!="") mata: map_init_vce_is_hac(HDFE_S, 1)
 
 * DoF Adjustments
 	if ("`dofadjustments'"=="") local dofadjustments all

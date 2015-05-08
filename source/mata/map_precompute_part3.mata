@@ -119,6 +119,5 @@ void map_precompute_part3(`Problem' S, transmorphic counter) {
 			}
 		}
 	}
-
 }
 end

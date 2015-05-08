@@ -6,6 +6,7 @@ void function map_precompute(`Problem' S) {
 	`Varlist' keepvars, cl_ivars
 	transmorphic counter, loc
 	`Varname' key
+	`String' all_clustervars
 	if (S.verbose>0) printf("\n{txt}{bf:mata: map_precompute()}\n")
 
 	// Count how many times each var is used, so we can drop them when the counter reaches zero
@@ -62,10 +63,17 @@ void function map_precompute(`Problem' S) {
 	if (S.verbose>3) printf("{txt}{bf: 4. Keeping the following variables}")
 	st_keepvar(keepvars)
 	// if (S.verbose>3) printf("\n{txt}    %s\n", invtokens(keepvars))
-	if (S.verbose>3) stata("describe _all, numbers")
+	if (S.verbose>3) stata("describe _all, numbers") // This resets r(..)!
 	if (S.verbose>3) printf("\n")
 
 	// Store N (todo: add other details) to ensure the dataset doesn't change from now on
 	S.N = st_nobs()
+
+	// Store updated clustervars (run after describe!)
+	for (h=1; h<=S.C;h++) {
+		all_clustervars = all_clustervars, S.clustervars[h]
+	}
+	st_rclear()
+	st_global("r(updated_clustervars)", invtokens(all_clustervars))
 }
 end

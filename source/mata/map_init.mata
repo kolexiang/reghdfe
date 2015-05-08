@@ -32,6 +32,8 @@ mata set matastrict on
 	S.stuck_threshold = 5e-3
 	S.N = .
 
+	S.groupvar = "" // Initialize as empty
+
 	S.keepsingletons = 0
 	S.G = G = st_numscalar("r(G)")
 	S.C = 0
@@ -75,7 +77,7 @@ mata set matastrict on
 		}
 	}
 	
-	st_numscalar("r(save_fe)", S.will_save_fe)
+	st_numscalar("r(will_save_fe)", S.will_save_fe)
 	return(S)
 }
 

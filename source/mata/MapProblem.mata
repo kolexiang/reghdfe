@@ -41,5 +41,10 @@ struct MapProblem {
 
 	// Temporary
 	`Boolean'		storing_betas
+	`Varname'		groupvar		// Name of the variable that will hold the mobility group
+	`Varname'		grouptype		// Long, double, etc.
+	`Varname'		grouplabel
+	`Series'		groupseries		// The actual data of the mobility group variable
+	`Series'		uid
 }
 end
