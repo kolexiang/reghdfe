@@ -1,4 +1,4 @@
-*! hdfe 3.0.6 08may2015
+*! hdfe 3.0.65 08may2015
 *! Sergio Correia (sergio.correia@duke.edu)
 
 
@@ -217,7 +217,7 @@ void function alphas2dta(`Problem' S) {
 
 	S.weightvar = S.weighttype = S.weights = ""
 	S.verbose = 0
-	S.transform = "cimmino"
+	S.transform = "symmetric_kaczmarz" // cimmino ?
 	S.acceleration = "conjugate_gradient"
 	S.tolerance = 1e-7
 	S.maxiterations = 1e4
@@ -1622,10 +1622,11 @@ program define reghdfe
 	}
 
 * Intercept call to old version
-	cap syntax anything(everything), [*] old
+	cap syntax anything(everything) [fw aw pw/], [*] old
 	if !c(rc) {
 		di as error "(running historical version of reghdfe)"
-		reghdfe_old `anything' , `options'
+		if ("`weight'"!="") local weightexp [`weight'=`exp']
+		reghdfe_old `anything' `weightexp', `options'
 		exit
 	}
 
@@ -1707,7 +1708,7 @@ end
 // -------------------------------------------------------------
 
 program define Version, eclass
-    local version "3.0.6 08may2015"
+    local version "3.0.65 08may2015"
     ereturn clear
     di as text "`version'"
     ereturn local version "`version'"

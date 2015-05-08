@@ -1,4 +1,4 @@
-*! hdfe 3.0.6 08may2015
+*! hdfe 3.0.65 08may2015
 *! Sergio Correia (sergio.correia@duke.edu)
 
 
@@ -217,7 +217,7 @@ void function alphas2dta(`Problem' S) {
 
 	S.weightvar = S.weighttype = S.weights = ""
 	S.verbose = 0
-	S.transform = "cimmino"
+	S.transform = "symmetric_kaczmarz" // cimmino ?
 	S.acceleration = "conjugate_gradient"
 	S.tolerance = 1e-7
 	S.maxiterations = 1e4

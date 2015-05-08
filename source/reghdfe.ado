@@ -24,10 +24,11 @@ program define reghdfe
 	}
 
 * Intercept call to old version
-	cap syntax anything(everything), [*] old
+	cap syntax anything(everything) [fw aw pw/], [*] old
 	if !c(rc) {
 		di as error "(running historical version of reghdfe)"
-		reghdfe_old `anything' , `options'
+		if ("`weight'"!="") local weightexp [`weight'=`exp']
+		reghdfe_old `anything' `weightexp', `options'
 		exit
 	}
 

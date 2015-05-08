@@ -13,7 +13,7 @@ mata set matastrict on
 
 	S.weightvar = S.weighttype = S.weights = ""
 	S.verbose = 0
-	S.transform = "cimmino"
+	S.transform = "symmetric_kaczmarz" // cimmino ?
 	S.acceleration = "conjugate_gradient"
 	S.tolerance = 1e-7
 	S.maxiterations = 1e4

@@ -1,4 +1,4 @@
-*! hdfe 3.0.6 08may2015
+*! hdfe 3.0.65 08may2015
 *! Sergio Correia (sergio.correia@duke.edu)
 
 // -------------------------------------------------------------
@@ -21,8 +21,8 @@ if ("`e(model)'"=="ols" & inlist("`e(vce)'", "unadjusted", "ols")) {
 
 	foreach var of local vars {
 		local skip1 = max(`skip1', length("`var'"))
-		local skip0 `skip1'
 	}
+	local skip0 `skip1'
 
 	foreach fe in `e(extended_absvars)' {
 		local skip1 = max(`skip1', length("`fe'"))
