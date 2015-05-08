@@ -1,4 +1,4 @@
-*! hdfe 3.0.65 08may2015
+*! hdfe 3.0.66 08may2015
 *! Sergio Correia (sergio.correia@duke.edu)
 
 
@@ -500,10 +500,10 @@ void map_precompute_part1(`Problem' S, transmorphic counter) {
 
 		// Note that the lhs is actually the deltas, as in "bys id: gen delta = _n==1"
 		id = rows_that_change(id) // 7% of function time
-		singleton = S.keepsingletons ? J(rows(id), 1, 0) : select_singletons(id) // 5% of function time
+		if (!S.keepsingletons) singleton = select_singletons(id) // 5% of function time
 
 		// Save IDs in dataset before dropping observations
-		id = runningsum(id :* !singleton) // this is the ID now, not the deltas anymore
+		id = S.keepsingletons ? runningsum(id) : runningsum(id :* !singleton) // this is the ID now, not the deltas anymore
 		S.fes[g].levels = id[length(id)]
 		vartype = S.fes[g].levels<=100 ? "byte" : (S.fes[g].levels<=32740? "int" : "long")
 		if (i<=G) {
@@ -513,7 +513,7 @@ void map_precompute_part1(`Problem' S, transmorphic counter) {
 			st_store(., S.fes[g].idvarname, sortedby? id : id[inv_p])
 		}
 
-		num_singletons = sum(singleton)
+		num_singletons = S.keepsingletons ? 0 : sum(singleton)
 		if (num_singletons>0) {
 			if (S.verbose>1) printf("{txt}(%f singletons)", num_singletons)
 			i_last_singleton = i
@@ -1708,7 +1708,7 @@ end
 // -------------------------------------------------------------
 
 program define Version, eclass
-    local version "3.0.65 08may2015"
+    local version "3.0.66 08may2015"
     ereturn clear
     di as text "`version'"
     ereturn local version "`version'"
