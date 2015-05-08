@@ -1,4 +1,4 @@
-*! hdfe 3.0.3 08may2015
+*! hdfe 3.0.6 08may2015
 *! Sergio Correia (sergio.correia@duke.edu)
 
 
@@ -1707,7 +1707,7 @@ end
 // -------------------------------------------------------------
 
 program define Version, eclass
-    local version "3.0.3 08may2015"
+    local version "3.0.6 08may2015"
     ereturn clear
     di as text "`version'"
     ereturn local version "`version'"
@@ -1958,7 +1958,10 @@ program define Estimate, eclass
 	if (`will_save_fe') {
 		Debug, level(2) msg("(calcualting fixed effects)")
 		tempvar resid
+		di as error "<`subpredict'>"
+		set trace on
 		`subpredict' double `resid', resid // equation: y = xb + d + e, we recovered "e"
+		asdasdasd
 		mata: store_resid(HDFE_S, "`resid'")
 		
 		qui use "`untransformed'"

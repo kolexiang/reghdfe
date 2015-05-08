@@ -228,7 +228,10 @@ program define Estimate, eclass
 	if (`will_save_fe') {
 		Debug, level(2) msg("(calcualting fixed effects)")
 		tempvar resid
+		di as error "<`subpredict'>"
+		set trace on
 		`subpredict' double `resid', resid // equation: y = xb + d + e, we recovered "e"
+		asdasdasd
 		mata: store_resid(HDFE_S, "`resid'")
 		
 		qui use "`untransformed'"
