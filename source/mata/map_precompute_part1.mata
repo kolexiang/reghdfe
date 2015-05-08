@@ -88,7 +88,7 @@ void map_precompute_part1(`Problem' S, transmorphic counter) {
 		g++
 	}
 
-	if (S.verbose>0) printf("{txt}    Singleton obs. dropped in total: {res}%f{txt}\n", initial_N-st_nobs())
+	printf("{txt}(%f singleton observations dropped)\n", initial_N-st_nobs())
 
 }
 

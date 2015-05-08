@@ -21,6 +21,9 @@
 	local FunctionPointer pointer(`Group' function) scalar // Used for the Accelerate & Transform fns
 
 // -------------------------------------------------------------------------------------------------
+	// This is not part of the MAP code but for simplicity we'll put it here
+	include fix_psd.mata
+
 	include assert_msg.mata
 	include FixedEffect.mata
 	include MapProblem.mata

@@ -141,6 +141,11 @@ shutil.copy(os.path.join(source_path, u"reghdfe.sthlp"), os.path.join(server_pat
 shutil.copy(os.path.join(source_path, u"hdfe.sthlp"), os.path.join(server_path, u"hdfe.sthlp"))
 shutil.copy(os.path.join(source_path, u"stata.toc"), os.path.join(server_path, u"stata.toc"))
 
+shutil.copy(os.path.join(source_path, u"reghdfe_old.ado"), os.path.join(server_path, u"reghdfe_old.ado"))
+shutil.copy(os.path.join(source_path, u"reghdfe_old_p.ado"), os.path.join(server_path, u"reghdfe_old_p.ado"))
+shutil.copy(os.path.join(source_path, u"reghdfe_old_estat.ado"), os.path.join(server_path, u"reghdfe_old_estat.ado"))
+shutil.copy(os.path.join(source_path, u"reghdfe_old_footnote.ado"), os.path.join(server_path, u"reghdfe_old_footnote.ado"))
+
 print("Building zip file")
 zipf = zipfile.ZipFile('../misc/reghdfe.zip', 'w')
 zipdir('../package/', zipf)

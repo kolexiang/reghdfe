@@ -11,7 +11,11 @@
 	discard
 	
 * Run scripts
+	adopath + "D:\Github\reghdfe\source\internal"
+	adopath + "D:\Github\reghdfe\source\common"
 	run test-absvars // Need to fix so we can find the path of the ADO
+	adopath - "D:\Github\reghdfe\source\internal"
+	adopath - "D:\Github\reghdfe\source\common"
 
 	*run test-minimal
 	set trace off
@@ -38,26 +42,27 @@
 	* Doesn't work: run test-cue
 	run test-liml
 
-	run test-singletons
+	// run test-singletons
 	run test-iv
 	run test-slope
 
 	run test-rank
 	
-	run test-avar
 	
 	run test-postestimation-test
 	run test-postestimation-predict
-
-	run test-cores
 	run test-attach
+
+	* BUGGED:
+	run test-avar
+
+	* TODO:
 	run test-stages
-
-	run test-cache
 	run test-over
-
 	run test-hdfe // just tests that the syntax works, not for correctness
 
+	//run test-cores
+	//run test-cache
 	* Don't run by default this as it's mostly a test about quipu.ado and not reghdfe.ado
 	*run test-quipu
 

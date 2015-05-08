@@ -55,7 +55,7 @@ noi cscript "reghdfe comparison with iv" adofile reghdfe
 	matrix list e(trim_V)
 	storedresults save benchmark e()
 
-	reghdfe `depvar' `indepvars' `endogvars', absorb(`absvars') vce(cluster `absvars', suite(avar)) dropsingletons
+	reghdfe `depvar' `indepvars' `endogvars', absorb(`absvars') vce(cluster `absvars', suite(avar))
 	estadd scalar r2 = e(r2_within), replace
 	local scale = e(unclustered_df_r) / (e(unclustered_df_r) + 1)
 	TrimMatrix `K' `scale'

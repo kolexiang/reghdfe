@@ -30,7 +30,7 @@ set trace off
 	local areg_df_a = e(df_a)
 	storedresults save areg e()
 
-	reghdfe price weight length, a(turn)
+	reghdfe price weight length, a(turn) keepsingletons
 	TrimMatrix 2
 	storedresults compare areg e(), tol(1e-10) include(scalar: df_r F N r2 matrix: trim_b trim_V macros: wexp wtype)
 	assert `areg_df_a'==e(df_a)-1
@@ -40,22 +40,22 @@ set trace off
 * [TEST] IV
 set trace off
 
-	reghdfe price weight (length=disp), a(turn) ivsuite(ivreg2)
+	reghdfe price weight (length=disp), a(turn) ivsuite(ivreg2) keepsingletons
 	TrimMatrix 2
 	storedresults save benchmark e()
 
-	reghdfe price weight (length=disp), a(turn) ivsuite(ivregress)
+	reghdfe price weight (length=disp), a(turn) ivsuite(ivregress) keepsingletons
 	TrimMatrix 2
 	storedresults compare benchmark e(), tol(1e-10) include(scalar: df_r df_a F N r2 matrix: trim_b trim_V macros: wexp wtype)
 
 	storedresults drop benchmark
 	
 * Misc
-	reghdfe price weight (length=disp), a(turn)
-	reghdfe price weight (length=disp), a(turn) vce(cluster rep) ivsuite(ivregress)
+	reghdfe price weight (length=disp), a(turn) keepsingletons
+	reghdfe price weight (length=disp), a(turn) vce(cluster rep) ivsuite(ivregress) keepsingletons
 	*reghdfe price weight (length=disp), a(turn) vce(cluster rep) ivsuite(ivregress) cores(2)
 	
-	reghdfe price weight (length=disp), a(turn) vce(cluster rep)
+	reghdfe price weight (length=disp), a(turn) vce(cluster rep) keepsingletons
 	
 cd "D:/Github/reghdfe/test"
 exit

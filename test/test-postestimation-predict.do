@@ -60,7 +60,7 @@ noi cscript "reghdfe postestimation: predict" adofile reghdfe
 	su resid, mean
 
 	* 2. Run reghdfe and compare
-	
+	set trace on
 	reghdfe `lhs' `rhs', absorb(FE=`absvars') vce(, suite(default))
 	TrimMatrix `K'
 	assert `bench_df_a'==e(df_a)-1

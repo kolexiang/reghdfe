@@ -133,6 +133,14 @@ void function map_init_groupsize(`Problem' S, `Integer' groupsize) {
 	S.groupsize = groupsize
 }
 
+void function map_init_panelvar(`Problem' S, `Varname' panelvar) {
+	S.panelvar = panelvar
+}
+
+void function map_init_timevar(`Problem' S, `Varname' timevar) {
+	S.timevar = timevar
+}
+
 void function map_init_acceleration(`Problem' S, `String' acceleration) {
 	acceleration = strlower(acceleration)
 	// Convert abbreviations

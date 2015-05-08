@@ -67,14 +67,14 @@ program define Parse
 		local num_type = cond("`weight'"=="fweight", "integers", "reals")
 		local basenote "weight {res}`weightvar'{txt} can only contain strictly positive `num_type', but"
 		qui cou if `weightvar'<0
-		Assert (`r(N)'==0), msg("`basenote' `r(N)' negative values were found!")
+		Assert (`r(N)'==0), msg("`basenote' `r(N)' negative values were found!")  rc(402)
 		qui cou if `weightvar'==0
 		if (`r(N)'>0) di as text "`basenote' `r(N)' zero values were found (will be dropped)"
 		qui cou if `weightvar'>=.
 		if (`r(N)'>0) di as text "`basenote' `r(N)' missing values were found (will be dropped)"
 		if ("`weight'"=="fweight") {
 			qui cou if mod(`weightvar',1) & `weightvar'<.
-			Assert (`r(N)'==0), msg("`basenote' `r(N)' non-integer values were found!")
+			Assert (`r(N)'==0), msg("`basenote' `r(N)' non-integer values were found!") rc(401)
 		}
 	}
 	local allkeys `allkeys' weightvar weighttype weightexp

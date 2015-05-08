@@ -50,7 +50,7 @@ cscript "reghdfe clustering and absorbing by the same variable" adofile reghdfe
 	
 	* 2. Run reghdfe
 	* To match -areg- we need to have dof(none)!
-	reghdfe `lhs' `rhs', absorb(`absvars') vce(cluster `clustervar') dof(none)
+	reghdfe `lhs' `rhs', absorb(`absvars') vce(cluster `clustervar') dof(none) keepsingletons
 	TrimMatrix `K'
 
 	* 3. Compare
@@ -72,7 +72,7 @@ cscript "reghdfe clustering and absorbing by the same variable" adofile reghdfe
 		di e(df_m)
 	* 2. Run reghdfe
 	* To match -areg- we need to have dof(none)!
-	reghdfe `lhs' `rhs', absorb(`absvars') vce(cluster `clustervar')
+	reghdfe `lhs' `rhs', absorb(`absvars') vce(cluster `clustervar') keepsingletons
 	TrimMatrix `K'
 	
 	* 3. Compare

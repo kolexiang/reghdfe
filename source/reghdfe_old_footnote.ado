@@ -1,11 +1,8 @@
-*! hdfe 3.0.3 08may2015
-*! Sergio Correia (sergio.correia@duke.edu)
-
 // -------------------------------------------------------------
 // Display Regression Footnote
 // -------------------------------------------------------------
 
-program reghdfe_footnote
+program reghdfe_old_footnote
 syntax [, linesize(int 79)]
 
 
@@ -21,14 +18,12 @@ if ("`e(model)'"=="ols" & inlist("`e(vce)'", "unadjusted", "ols")) {
 
 	foreach var of local vars {
 		local skip1 = max(`skip1', length("`var'"))
-		local skip0 `skip1'
 	}
-
-	foreach fe in `e(extended_absvars)' {
+	foreach fe in `e(absvars)' {
 		local skip1 = max(`skip1', length("`fe'"))
 	}
 
-	di as text %`skip0's "Absorbed" " {c |}" ///
+	di as text %`skip1's "Absorbed" " {c |}" ///
 		_skip(`skip3') `"`todisp'"' ///
 		as res %10.3f e(F_absorb) %8.3f fprob(e(df_a),e(df_r),e(F_absorb)) ///
 		as text _skip(13) `"(Joint test)"'
@@ -38,10 +33,11 @@ if ("`e(model)'"=="ols" & inlist("`e(vce)'", "unadjusted", "ols")) {
 
 	* Show by-fe FStats
 	* Relevant macros: NUM_FE, FE1, .., FE_TARGET1, .., FE_VARLIST
+	local i 0
 	local r2 = 1 - e(rss0)/e(tss)
 	local r2_report %4.3f `r2'
-	forval i = 1/`e(N_hdfe_extended)' {
-		local fe : word `i' of `e(extended_absvars)'
+	foreach fe in `e(absvars)' {
+		local ++i
 		if (e(F_absorb`i')<.) {
 			di as text %`skip1's "`fe'" " {c |}" _continue
 			
@@ -62,7 +58,7 @@ if ("`e(model)'"=="ols" & inlist("`e(vce)'", "unadjusted", "ols")) {
 			*di as text _skip(`skip') `"(`data')"'
 		}
 	}
-	di as text "{hline `=1+`skip0''}{c BT}{hline 64}"
+	di as text "{hline `=1+`skip1''}{c BT}{hline 64}"
 	if (e(rss0)<.) di as text " R-squared as we add HDFEs: " `r2_report'
 } // regress-unadjusted specific
 else {
@@ -76,24 +72,21 @@ else {
 * Show category data
 di as text
 di as text "Absorbed degrees of freedom:"
-di as text "{hline `WX'}{c TT}{hline 49}{c TRC}"   // {c TT}{hline 14}"
+di as text "{hline `WX'}{c TT}{hline 49}{c TT}{hline 14}"
 di as text %`skip1's "Absorbed FE" " {c |}" ///
 	%13s "Num. Coefs." ///
 	%16s "=   Categories" ///
 	%15s "-   Redundant" ///
 	"     {c |} " _continue
 
-// if ("`e(corr1)'"!="") di as text %13s "Corr. w/xb" _continue
-di as text _n "{hline `WX'}{c +}{hline 49}{c RT}"  // {c +}{hline 14}"
+if ("`e(corr1)'"!="") di as text %13s "Corr. w/xb" _continue
+di as text _n "{hline `WX'}{c +}{hline 49}{c +}{hline 14}"
 
 	local i 0
 	local explain_exact 0
 	local explain_nested 0
-
-	forval i = 1/`e(N_hdfe_extended)' {
-		local fe : word `i' of `e(extended_absvars)'
-
-
+	foreach fe in `e(absvars)' {
+		local ++i
 		di as text %`skip1's "`fe'" " {c |}" _continue
 		local numcoefs = e(K`i') - e(M`i')
 
@@ -111,12 +104,12 @@ di as text _n "{hline `WX'}{c +}{hline 49}{c RT}"  // {c +}{hline 14}"
 		
 		di as text %15s "`e(M`i')'" _continue
 		di as text %2s "`note'" "   {c |} " _continue
-		//if ("`e(corr`i')'"!="") {
-		//	di as text %13.4f `e(corr`i')' _continue
-		//}
+		if ("`e(corr`i')'"!="") {
+			di as text %13.4f `e(corr`i')' _continue
+		}
 		di
 	}
-di as text "{hline `WX'}{c BT}{hline 49}{c BRC}" // {c BT}{hline 14}"
+di as text "{hline `WX'}{c BT}{hline 49}{c BT}{hline 14}"
 if (`explain_exact') di as text "? = number of redundant parameters may be higher"
 if (`explain_nested') di as text `"* = fixed effect nested within cluster; treated as redundant for DoF computation"'
 // di as text _skip(4) "Fixed effect indicators: " in ye "`e(absvars)'"

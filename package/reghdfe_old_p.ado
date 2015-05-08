@@ -1,11 +1,8 @@
-*! hdfe 3.0.3 08may2015
-*! Sergio Correia (sergio.correia@duke.edu)
-
 *! version 1.1.0 10jul2014
 * predict after reghdfe
 * TODO: Not tested for -avge- variables!
 
-program define reghdfe_p
+program define reghdfe_old_p
 	local version `clip(`c(version)', 11.2, 13.1)' // 11.2 minimum, 13+ preferred
 	qui version `version'
 	

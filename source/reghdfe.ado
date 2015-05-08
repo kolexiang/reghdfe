@@ -9,10 +9,25 @@ program define reghdfe
 * Set Stata version
 	version `=clip(`c(version)', 11.2, 13.1)' // 11.2 minimum, 13+ preferred
 
+* Intercept old version call
+	cap syntax, version old
+	if !c(rc) {
+		reghdfe_old, version
+		exit
+	}
+
 * Intercept version calls
 	cap syntax, version
 	if !c(rc) {
 		Version
+		exit
+	}
+
+* Intercept call to old version
+	cap syntax anything(everything), [*] old
+	if !c(rc) {
+		di as error "(running historical version of reghdfe)"
+		reghdfe_old `anything' , `options'
 		exit
 	}
 
@@ -50,6 +65,7 @@ include "internal/Estimate.ado"
 	include "internal/Wrapper_regress.ado"
 	include "internal/Wrapper_avar.ado"
 	include "internal/Wrapper_mwc.ado"
+		include "internal/GenerateID.ado"
 	include "internal/Wrapper_ivregress.ado"
 	include "internal/Wrapper_ivreg2.ado"
 

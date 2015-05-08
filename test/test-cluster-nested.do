@@ -40,9 +40,9 @@ cscript "reghdfe fixed effect nested in cluster" adofile reghdfe
 
 	* Check that _xtreg_chk_cl2 is working
 
-	reghdfe `lhs' `rhs', abs(`absvars') vce(cluster `clustervar') dof(clusters)
+	reghdfe `lhs' `rhs', abs(`absvars') vce(cluster `clustervar') dof(clusters) keepsingletons
 	assert e(df_a)==1
-	reghdfe `lhs' `rhs', abs(`absvars') vce(cluster `clustervar')
+	reghdfe `lhs' `rhs', abs(`absvars') vce(cluster `clustervar') keepsingletons
 	assert e(df_a)==1
 
 // -------------------------------------------------------------------------------------------------
@@ -59,7 +59,7 @@ cscript "reghdfe fixed effect nested in cluster" adofile reghdfe
 	storedresults save benchmark e()
 	
 	* 2. Run reghdfe
-	reghdfe `lhs' `rhs', absorb(`absvars') vce(cluster `clustervar')
+	reghdfe `lhs' `rhs', absorb(`absvars') vce(cluster `clustervar') keepsingletons
 	di e(df_a)
 	di e(df_m)
 	* NOTE: See statalist post for discussion on df_m discrepancy
@@ -83,9 +83,9 @@ cscript "reghdfe fixed effect nested in cluster" adofile reghdfe
 
 	* Check that _xtreg_chk_cl2 is working
 
-	reghdfe `lhs' `rhs', abs(`absvars') vce(cluster `clustervar') dof(clusters)
+	reghdfe `lhs' `rhs', abs(`absvars') vce(cluster `clustervar') dof(clusters) keepsingletons
 	assert e(df_a)==1
-	reghdfe `lhs' `rhs', abs(`absvars') vce(cluster `clustervar')
+	reghdfe `lhs' `rhs', abs(`absvars') vce(cluster `clustervar') keepsingletons
 	assert e(df_a)==1
 
 // -------------------------------------------------------------------------------------------------
@@ -106,7 +106,7 @@ cscript "reghdfe fixed effect nested in cluster" adofile reghdfe
 	storedresults save benchmark e()
 	
 	* 2. Run reghdfe
-	reghdfe `lhs' `rhs', absorb(`absvars') vce(cluster `clustervar')
+	reghdfe `lhs' `rhs', absorb(`absvars') vce(cluster `clustervar') keepsingletons
 	di e(df_a)
 	di e(df_m)
 	* NOTE: See statalist post for discussion on df_m discrepancy
