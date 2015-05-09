@@ -3,7 +3,7 @@ mata set matastrict on
 void map_precompute_part3(`Problem' S, transmorphic counter) {
 	`Integer' g, h, i, j, n, L, i_lower, i_upper
 	`Varname' var
-	`Boolean' done, is_nested, sortedby
+	`Boolean' done, is_nested, sortedby, hac_exception
 	`Vector' need_to_create_clustervar, range
 	`Varlist' sorted_fe_ivars, sorted_cl_ivars, cl_ivars
 	`String' vartype
@@ -25,7 +25,8 @@ void map_precompute_part3(`Problem' S, transmorphic counter) {
 		for (h=1; h<=S.C;h++) {
 			sorted_cl_ivars = tokens(S.clustervars[h], "#")
 			sorted_cl_ivars = sort(select(sorted_cl_ivars, sorted_cl_ivars:!="#")', 1)'
-			if (sorted_fe_ivars==sorted_cl_ivars) {
+			hac_exception = (sorted_cl_ivars==S.panelvar | sorted_cl_ivars==S.timevar) & S.vce_is_hac
+			if (sorted_fe_ivars==sorted_cl_ivars & !hac_exception) {
 				need_to_create_clustervar[h] = 0
 				S.clustervars[h] = var
 				st_varlabel(var, sprintf("[CLUSTER] %s", st_varlabel(var)))
