@@ -46,8 +46,9 @@ void map_precompute_part2(`Problem' S, transmorphic counter) {
 			// EG: weights, no intercept, intercept, only one slope, etc.
 			for (k=1; k<=K; k++) {
 				// BUGBUG
-				stdev = sqrt(quadvariance(S.fes[g].x[., k]))
-				if (stdev>1e-5) S.fes[g].x[., k] = S.fes[g].x[., k] :/ stdev
+				stdev = 1 // sqrt(quadvariance(S.fes[g].x[., k]))
+				if (stdev<1e-5) stdev = 1e-5 // Reduce accuracy errors
+				S.fes[g].x[., k] = S.fes[g].x[., k] :/ stdev
 			}
 
 			// Demean X and precompute inv(X'X) (where X excludes the constant due to demeaning, if applicable)
@@ -111,6 +112,8 @@ void map_precompute_part2(`Problem' S, transmorphic counter) {
 		w = sortedby ? S.w : S.w[S.fes[g].p]
 		assert(rows(w)==rows(S.fes[g].x))
 	}
+
+	if (has_intercept) S.fes[g].xmeans = J(L, K, .)
 	
 	i_lower = 1
 	for (j=1; j<=L; j++) {
@@ -119,8 +122,8 @@ void map_precompute_part2(`Problem' S, transmorphic counter) {
 		tmp_w = has_weights ? w[| i_lower \ i_upper |] : 1
 		tmp_x = S.fes[g].x[| i_lower , 1 \ i_upper , . |]
 		if (has_intercept) {
-			tmp_x = tmp_x :- (quadcolsum(has_weights ? tmp_x :* tmp_w : tmp_x) / tmp_count)
-			S.fes[g].x[| i_lower , 1 \ i_upper , . |] = tmp_x
+			S.fes[g].xmeans[j, .] = quadcolsum(has_weights ? tmp_x :* tmp_w : tmp_x) / tmp_count
+			S.fes[g].x[| i_lower , 1 \ i_upper , . |] = tmp_x = tmp_x :- S.fes[g].xmeans[j, .]
 		}
 		ans[| 1+(j-1)*K , 1 \ j*K , . |] = invsym(quadcross(tmp_x, tmp_w, tmp_x))
 		i_lower = i_upper + 1

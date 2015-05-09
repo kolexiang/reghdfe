@@ -127,7 +127,7 @@ program define Parse
 	mata: st_local("hascomma", strofreal(strpos("`vce'", ","))) // is there a commma already in `vce'?
 	if (!`hascomma') local vce `vce' ,
 	ParseVCE `vce' weighttype(`weighttype')
-	local keys vceoption vcetype vcesuite vceextra num_clusters clustervars bw kernel dkraay twicerobust
+	local keys vceoption vcetype vcesuite vceextra num_clusters clustervars bw kernel dkraay kiefer twicerobust
 	foreach key of local keys {
 		local `key' "`s(`key')'"
 	}

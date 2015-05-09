@@ -1,4 +1,4 @@
-*! hdfe 3.0.187 08may2015
+*! hdfe 3.0.339 09may2015
 *! Sergio Correia (sergio.correia@duke.edu)
 
 // -------------------------------------------------------------
@@ -66,7 +66,7 @@ if ("`e(model)'"=="ols" & inlist("`e(vce)'", "unadjusted", "ols")) {
 	if (e(rss0)<.) di as text " R-squared as we add HDFEs: " `r2_report'
 } // regress-unadjusted specific
 else {
-	local skip1 = e(width)
+	local skip1 = max(e(width), 12)
 	foreach fe in `e(absvars)' {
 		local skip1 = max(`skip1', length("`fe'"))
 	}

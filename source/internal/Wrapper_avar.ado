@@ -96,7 +96,7 @@ program define Wrapper_avar, eclass
 
 * Avoid corner case error when all the RHS vars are collinear with the FEs
 	local unclustered_df_r = `df_r' // Used later in R2 adj
-	if (`dkraay'>1) local clustervars "`_dta[_TStvar]'"
+	if (`dkraay'>1) local clustervars "`_dta[_TStvar]'" // BUGBUG ?
 	if ("`clustervars'"!="") local df_r = `M' - 1
 
 	capture ereturn post `b' `V' `weightexp', dep(`depvar') obs(`N') dof(`df_r') properties(b V)
@@ -115,8 +115,8 @@ program define Wrapper_avar, eclass
 	ereturn scalar rss = `rss'
 	ereturn scalar tss = `tss'
 	if ("`N_clust'"!="") ereturn scalar N_clust = `N_clust'
-	if ("`N_clust1'"!="") ereturn scalar N_clust1 = `N_clust1'
-	if ("`N_clust2'"!="") ereturn scalar N_clust2 = `N_clust2'
+	if ("`N_clust1'"!="" & "`N_clust1'"!=".") ereturn scalar N_clust1 = `N_clust1'
+	if ("`N_clust2'"!="" & "`N_clust2'"!=".") ereturn scalar N_clust2 = `N_clust2'
 	ereturn `hidden' scalar unclustered_df_r = `unclustered_df_r'
 
 	if (`bw'>1) {

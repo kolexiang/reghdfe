@@ -74,7 +74,7 @@ program define ParseVCE, sclass
 	if ("`vceextra'"!="") local vceextra , `vceextra'
 	local vceoption "`vcetype'`temp_clustervars'`vceextra'" // this excludes "vce(", only has the contents
 
-	local keys vceoption vcetype vcesuite vceextra num_clusters clustervars bw kernel dkraay twicerobust
+	local keys vceoption vcetype vcesuite vceextra num_clusters clustervars bw kernel dkraay twicerobust kiefer
 	foreach key of local keys {
 		sreturn local `key' ``key''
 	}

@@ -8,7 +8,7 @@ mata set matastrict on
 	`Group'		ans
 	`Vector'	tmp_w, tmp_count
 	real rowvector b
-	real rowvector ymean // 1*Q
+	real rowvector ymean, alpha // 1*Q
 	real rowvector zero // 1*K
 	`Matrix'	tmp_y, tmp_x
 	pointer(`Series') scalar p_sorted_w
@@ -42,30 +42,42 @@ mata set matastrict on
 		tmp_y = ans[| i_lower , 1 \ i_upper , . |]
 		// BUGBUG: quadcolsum or colsum ? Depends if there are dense FEs. Maybe condition it on L??
 		if (has_weights) {
-			ymean = has_intercept ? (colsum(tmp_y :* tmp_w) / tmp_count) : 0
+			ymean = has_intercept ? (quadcolsum(tmp_y :* tmp_w) / tmp_count) : 0
 		}
 		else {
-			ymean = has_intercept ? (colsum(tmp_y) / tmp_count) : 0
+			ymean = has_intercept ? (quadcolsum(tmp_y) / tmp_count) : 0
 		}
 
 		if (K>0) {
 			tmp_x = S.fes[g].x[| i_lower , 1 \ i_upper , . |]
 			// BUGBUG crossdev/cross or their quad version?
 			if (has_intercept) {
-				b = S.fes[g].inv_xx[| 1+(j-1)*K , 1 \ j*K , . |] * crossdev(tmp_x, zero, tmp_w, tmp_y, ymean)
+				b = S.fes[g].inv_xx[| 1+(j-1)*K , 1 \ j*K , . |] * quadcrossdev(tmp_x, zero, tmp_w, tmp_y, ymean)
+				alpha = ymean - S.fes[g].xmeans[j, .] * b
 			}
 			else {
-				b = S.fes[g].inv_xx[| 1+(j-1)*K , 1 \ j*K , . |] * cross(tmp_x, tmp_w, tmp_y)
+				b = S.fes[g].inv_xx[| 1+(j-1)*K , 1 \ j*K , . |] * quadcross(tmp_x, tmp_w, tmp_y)
 			}
 		}
 		
 		if (storing_betas) {
-			if (has_intercept) S.fes[g].tmp_alphas[j, 1] = ymean
+			if (has_intercept) S.fes[g].tmp_alphas[j, 1] = K==0 ? ymean : alpha
 			if (K>0) S.fes[g].tmp_alphas[j, (has_intercept+1)..(has_intercept+K) ] = b'
 		}
 
 		// BUGBUG if we split this ternary will it be faster?
-		ans[| i_lower , 1 \ i_upper , . |] = K>0 ? (ymean :+ tmp_x*b) : (ymean :+ J(i_upper-i_lower+1,Q,0))
+		//ans[| i_lower , 1 \ i_upper , . |] = K>0 ? (ymean :+ tmp_x*b) : (ymean :+ J(i_upper-i_lower+1,Q,0))
+		if (K==0) {
+			ans[| i_lower , 1 \ i_upper , . |] = ymean :+ J(i_upper-i_lower+1,Q,0)
+		}
+		else if (has_intercept) {
+			ans[| i_lower , 1 \ i_upper , . |] = ymean :+ tmp_x*b
+		}
+		else {
+			ans[| i_lower , 1 \ i_upper , . |] = tmp_x*b
+		}
+
+
 		i_lower = i_upper + 1
 	}
 		

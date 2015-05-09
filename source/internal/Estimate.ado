@@ -336,6 +336,10 @@ program define Estimate, eclass
 		//if ("`clustvar'"!="") ereturn local clustvar "`clustervars'"
 		ereturn scalar N_clustervars = `num_clusters'
 	}
+	if (`dkraay'>1) {
+		ereturn local clustvar `timevar'
+		ereturn scalar N_clustervars = 1
+	}
 
 	* Besides each cmd's naming style (e.g. exogr, exexog, etc.) keep one common one
 	foreach cat in depvar indepvars endogvars instruments {

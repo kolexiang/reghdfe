@@ -1,4 +1,4 @@
-*! hdfe 3.0.187 08may2015
+*! hdfe 3.0.339 09may2015
 *! Sergio Correia (sergio.correia@duke.edu)
 
 
@@ -80,6 +80,7 @@ void assert_msg(real scalar t, | string scalar msg)
 		`Vector'	counts			// number of obs. (weighted) with that value
 		`Group'		x				// Vector/Matrix of (optionally demeaned) cvars
 		`Matrix'	inv_xx			// Blocks of the inv(x'x) matrix; size KL*K (k=num_slopes, L=levels)
+		`Matrix'	xmeans
 
 		`Boolean'	is_clustervar, in_clustervar
 		`Integer'	nesting_clustervar // Clustervar that nests this FE, if any
@@ -234,11 +235,13 @@ void function alphas2dta(`Problem' S) {
 //  Parse absvars and initialize the almost empty MapProblem struct
 `Problem' function map_init()
 {
-	`Integer'		g, G, num_slopes, has_intercept, i
+	`Integer'		g, G, num_slopes, has_intercept, i, H, j
 	`Problem' 		S
 	`Boolean'		auto_target // Automatically assign target names to all FEs
 	`Varname'		basetarget
 	`Varlist'		target, original_absvars, extended_absvars
+	`String'		equation_d
+	`Boolean'		equation_d_valid
 	pointer(`FE') 	fe
 
 	S.weightvar = S.weighttype = S.weights = ""
@@ -316,6 +319,25 @@ void function alphas2dta(`Problem' S) {
 			fe->target = target
 		}
 	}
+
+	equation_d_valid = 1
+	equation_d = ""
+	for (g=1; g<=S.G; g++) {
+		H = S.fes[g].has_intercept + S.fes[g].num_slopes
+		if (length(S.fes[g].target)==0) {
+			equation_d_valid = 0
+			break
+		}
+		assert(length(S.fes[g].target==H))
+
+		j = 0
+		for (i=1; i<=H;i++) {
+			equation_d = equation_d + sprintf("%s%s", equation_d=="" ? "" : " + ", S.fes[g].target[i])
+			if (i>1 | !S.fes[g].has_intercept) j++ // j is the cvar counter
+			if (j>0) equation_d = equation_d + sprintf(" * %s", S.fes[g].cvars[j])
+		}
+	}
+	if (equation_d_valid) st_global("r(equation_d)", invtokens(equation_d) )
 	
 	st_numscalar("r(will_save_fe)", S.will_save_fe)
 	st_global("r(original_absvars)", invtokens(original_absvars) )
@@ -549,7 +571,7 @@ void map_precompute_part1(`Problem' S, transmorphic counter) {
 			singleton = sortedby? singleton : singleton[inv_p]
 			st_dropobsif(singleton)
 			if (!st_nobs()) {
-				printf("{err}\nno observations left after dropping singletons\n")
+				printf("{err}\nno observations left after dropping singletons (%f obs. dropped)\n", initial_N)
 				exit(error(2001))
 			}
 
@@ -674,8 +696,9 @@ void map_precompute_part2(`Problem' S, transmorphic counter) {
 			// EG: weights, no intercept, intercept, only one slope, etc.
 			for (k=1; k<=K; k++) {
 				// BUGBUG
-				stdev = sqrt(quadvariance(S.fes[g].x[., k]))
-				if (stdev>1e-5) S.fes[g].x[., k] = S.fes[g].x[., k] :/ stdev
+				stdev = 1 // sqrt(quadvariance(S.fes[g].x[., k]))
+				if (stdev<1e-5) stdev = 1e-5 // Reduce accuracy errors
+				S.fes[g].x[., k] = S.fes[g].x[., k] :/ stdev
 			}
 
 			// Demean X and precompute inv(X'X) (where X excludes the constant due to demeaning, if applicable)
@@ -739,6 +762,8 @@ void map_precompute_part2(`Problem' S, transmorphic counter) {
 		w = sortedby ? S.w : S.w[S.fes[g].p]
 		assert(rows(w)==rows(S.fes[g].x))
 	}
+
+	if (has_intercept) S.fes[g].xmeans = J(L, K, .)
 	
 	i_lower = 1
 	for (j=1; j<=L; j++) {
@@ -747,8 +772,8 @@ void map_precompute_part2(`Problem' S, transmorphic counter) {
 		tmp_w = has_weights ? w[| i_lower \ i_upper |] : 1
 		tmp_x = S.fes[g].x[| i_lower , 1 \ i_upper , . |]
 		if (has_intercept) {
-			tmp_x = tmp_x :- (quadcolsum(has_weights ? tmp_x :* tmp_w : tmp_x) / tmp_count)
-			S.fes[g].x[| i_lower , 1 \ i_upper , . |] = tmp_x
+			S.fes[g].xmeans[j, .] = quadcolsum(has_weights ? tmp_x :* tmp_w : tmp_x) / tmp_count
+			S.fes[g].x[| i_lower , 1 \ i_upper , . |] = tmp_x = tmp_x :- S.fes[g].xmeans[j, .]
 		}
 		ans[| 1+(j-1)*K , 1 \ j*K , . |] = invsym(quadcross(tmp_x, tmp_w, tmp_x))
 		i_lower = i_upper + 1
@@ -762,7 +787,7 @@ void map_precompute_part2(`Problem' S, transmorphic counter) {
 void map_precompute_part3(`Problem' S, transmorphic counter) {
 	`Integer' g, h, i, j, n, L, i_lower, i_upper
 	`Varname' var
-	`Boolean' done, is_nested, sortedby
+	`Boolean' done, is_nested, sortedby, hac_exception
 	`Vector' need_to_create_clustervar, range
 	`Varlist' sorted_fe_ivars, sorted_cl_ivars, cl_ivars
 	`String' vartype
@@ -784,7 +809,8 @@ void map_precompute_part3(`Problem' S, transmorphic counter) {
 		for (h=1; h<=S.C;h++) {
 			sorted_cl_ivars = tokens(S.clustervars[h], "#")
 			sorted_cl_ivars = sort(select(sorted_cl_ivars, sorted_cl_ivars:!="#")', 1)'
-			if (sorted_fe_ivars==sorted_cl_ivars) {
+			hac_exception = (sorted_cl_ivars==S.panelvar | sorted_cl_ivars==S.timevar) & S.vce_is_hac
+			if (sorted_fe_ivars==sorted_cl_ivars & !hac_exception) {
 				need_to_create_clustervar[h] = 0
 				S.clustervars[h] = var
 				st_varlabel(var, sprintf("[CLUSTER] %s", st_varlabel(var)))
@@ -888,7 +914,7 @@ void map_precompute_part3(`Problem' S, transmorphic counter) {
 	`Group'		ans
 	`Vector'	tmp_w, tmp_count
 	real rowvector b
-	real rowvector ymean // 1*Q
+	real rowvector ymean, alpha // 1*Q
 	real rowvector zero // 1*K
 	`Matrix'	tmp_y, tmp_x
 	pointer(`Series') scalar p_sorted_w
@@ -922,30 +948,42 @@ void map_precompute_part3(`Problem' S, transmorphic counter) {
 		tmp_y = ans[| i_lower , 1 \ i_upper , . |]
 		// BUGBUG: quadcolsum or colsum ? Depends if there are dense FEs. Maybe condition it on L??
 		if (has_weights) {
-			ymean = has_intercept ? (colsum(tmp_y :* tmp_w) / tmp_count) : 0
+			ymean = has_intercept ? (quadcolsum(tmp_y :* tmp_w) / tmp_count) : 0
 		}
 		else {
-			ymean = has_intercept ? (colsum(tmp_y) / tmp_count) : 0
+			ymean = has_intercept ? (quadcolsum(tmp_y) / tmp_count) : 0
 		}
 
 		if (K>0) {
 			tmp_x = S.fes[g].x[| i_lower , 1 \ i_upper , . |]
 			// BUGBUG crossdev/cross or their quad version?
 			if (has_intercept) {
-				b = S.fes[g].inv_xx[| 1+(j-1)*K , 1 \ j*K , . |] * crossdev(tmp_x, zero, tmp_w, tmp_y, ymean)
+				b = S.fes[g].inv_xx[| 1+(j-1)*K , 1 \ j*K , . |] * quadcrossdev(tmp_x, zero, tmp_w, tmp_y, ymean)
+				alpha = ymean - S.fes[g].xmeans[j, .] * b
 			}
 			else {
-				b = S.fes[g].inv_xx[| 1+(j-1)*K , 1 \ j*K , . |] * cross(tmp_x, tmp_w, tmp_y)
+				b = S.fes[g].inv_xx[| 1+(j-1)*K , 1 \ j*K , . |] * quadcross(tmp_x, tmp_w, tmp_y)
 			}
 		}
 		
 		if (storing_betas) {
-			if (has_intercept) S.fes[g].tmp_alphas[j, 1] = ymean
+			if (has_intercept) S.fes[g].tmp_alphas[j, 1] = K==0 ? ymean : alpha
 			if (K>0) S.fes[g].tmp_alphas[j, (has_intercept+1)..(has_intercept+K) ] = b'
 		}
 
 		// BUGBUG if we split this ternary will it be faster?
-		ans[| i_lower , 1 \ i_upper , . |] = K>0 ? (ymean :+ tmp_x*b) : (ymean :+ J(i_upper-i_lower+1,Q,0))
+		//ans[| i_lower , 1 \ i_upper , . |] = K>0 ? (ymean :+ tmp_x*b) : (ymean :+ J(i_upper-i_lower+1,Q,0))
+		if (K==0) {
+			ans[| i_lower , 1 \ i_upper , . |] = ymean :+ J(i_upper-i_lower+1,Q,0)
+		}
+		else if (has_intercept) {
+			ans[| i_lower , 1 \ i_upper , . |] = ymean :+ tmp_x*b
+		}
+		else {
+			ans[| i_lower , 1 \ i_upper , . |] = tmp_x*b
+		}
+
+
 		i_lower = i_upper + 1
 	}
 		

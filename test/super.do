@@ -22,18 +22,17 @@
 	set tracedepth 5
 	set varabbrev on
 
-
-	run test-postestimation-predict
-	run test-postestimation-test
-	run test-attach
-
-
-	
-
 	run test-unadjusted
 	run test-robust
 	run test-cluster
 	run test-ivreg2
+
+	* TODO NOW:
+	run test-stages
+	run test-over
+
+	run test-avar
+
 	run test-cluster-same-as-absvar
 	run test-cluster-nested // Prevent regression of bug reported by Michael Wittry (see email)
 	run test-vce-complex-bw
@@ -55,16 +54,13 @@
 
 	run test-rank
 	
-	
+	run test-postestimation-predict
+	run test-postestimation-test
+	run test-attach
 
 
-	* BUGGED:
-	run test-avar
-
-	* TODO:
-	run test-stages
-	run test-over
-	run test-hdfe // just tests that the syntax works, not for correctness
+	* TODO LATER:
+	// run test-hdfe // just tests that the syntax works, not for correctness
 
 	//run test-cores
 	//run test-cache

@@ -23,6 +23,7 @@ mata set matastrict on
 		`Vector'	counts			// number of obs. (weighted) with that value
 		`Group'		x				// Vector/Matrix of (optionally demeaned) cvars
 		`Matrix'	inv_xx			// Blocks of the inv(x'x) matrix; size KL*K (k=num_slopes, L=levels)
+		`Matrix'	xmeans
 
 		`Boolean'	is_clustervar, in_clustervar
 		`Integer'	nesting_clustervar // Clustervar that nests this FE, if any
