@@ -228,18 +228,16 @@ program define Estimate, eclass
 	if (`will_save_fe') {
 		Debug, level(2) msg("(calcualting fixed effects)")
 		tempvar resid
-		di as error "<`subpredict'>"
-		set trace on
-		`subpredict' double `resid', resid // equation: y = xb + d + e, we recovered "e"
-		asdasdasd
+		local score = cond("`model'"=="ols", "score", "resid")
+		`subpredict' double `resid', `score' // equation: y = xb + d + e, we recovered "e"
 		mata: store_resid(HDFE_S, "`resid'")
 		
-		qui use "`untransformed'"
+		qui use "`untransformed'", clear
 		erase "`untransformed'"
 		mata: resid2dta(HDFE_S)
 
 		tempvar resid_d
-		`subpredict' double `resid_d', resid // This is "d+e" (including constant)
+		`subpredict' double `resid_d', `score' // This is "d+e" (including constant)
 
 		if ("`weightvar'"!="") assert "`tmpweightexp'"!=""
 		su `resid_d' `tmpweightexp', mean

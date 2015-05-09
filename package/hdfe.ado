@@ -1,4 +1,4 @@
-*! hdfe 3.0.67 08may2015
+*! hdfe 3.0.187 08may2015
 *! Sergio Correia (sergio.correia@duke.edu)
 
 
@@ -135,6 +135,8 @@ struct MapProblem {
 	`Varname'		grouplabel
 	`Series'		groupseries		// The actual data of the mobility group variable
 	`Series'		uid
+	`Series'		resid
+	`Varname'		residname
 }
 	
 real rowvector safe_divide(real rowvector numerator, real rowvector denominator, | real scalar epsi) {
@@ -149,6 +151,8 @@ void verbose2local(`Problem' S, string scalar loc) {
 	st_local(loc, strofreal(S.verbose))
 }
 
+// -------------------------------------------------------------------------------------------------
+
 void function store_uid(`Problem' S, `Varname' varname) {
 	S.uid = st_data(., varname)
 	assert_msg(rows(S.uid)==S.N, "assertion failed: rows(S.uid)==S.N")
@@ -157,6 +161,22 @@ void function store_uid(`Problem' S, `Varname' varname) {
 void function drop_uid(`Problem' S) {
 	S.uid = J(0,0,.)
 }
+
+// -------------------------------------------------------------------------------------------------
+
+void function store_resid(`Problem' S, `Varname' varname) {
+	S.resid = st_data(., varname)
+	S.residname = varname
+	assert_msg(rows(S.resid)==S.N, "assertion failed: rows(S.resid)==S.N")
+}
+
+void function resid2dta(`Problem' S) {
+	st_store(., st_addvar("double", S.residname), S.resid)
+	S.resid = J(0,0,.)
+	S.residname = ""
+}
+
+// -------------------------------------------------------------------------------------------------
 
 void function groupvar2dta(`Problem' S) {
 	if (S.groupvar!="") {
@@ -172,6 +192,8 @@ void function groupvar2dta(`Problem' S) {
 	}
 }
 
+// -------------------------------------------------------------------------------------------------
+
 void function drop_ids(`Problem' S) {
 	`Integer' g
 	for (g=1;g<=S.G;g++) {
@@ -179,10 +201,14 @@ void function drop_ids(`Problem' S) {
 	}
 }
 
+// -------------------------------------------------------------------------------------------------
+
 void function esample2dta(`Problem' S, `Varname' esample) {
 	assert(length(S.uid)>0)
 	st_store(S.uid, st_addvar("byte", esample), J(rows(S.uid),1,1) )
 }
+
+// -------------------------------------------------------------------------------------------------
 
 // Copy the fixed effect estimates (the alphas back into the original dataset)
 void function alphas2dta(`Problem' S) {
@@ -1094,23 +1120,22 @@ void function map_solve(`Problem' S, `Varlist' vars,
 	// A discussion on the stopping criteria used is described in
 	// http://scicomp.stackexchange.com/questions/582/stopping-criteria-for-iterative-linear-solvers-applied-to-nearly-singular-system/585#585
 
-	improvement_potential = quadcolsum(y :* y)
+	improvement_potential = weighted_quadcolsum(S, y, y)
 	recent_ssr = J(d, Q, .)
 	
 	(*T)(S, y, r, 1)
-	ssr = quadcolsum(r :* r) // cross(r,r) when cols(y)==1 // BUGBUG maybe diag(quadcross()) is faster?
+	ssr = weighted_quadcolsum(S, r, r) // cross(r,r) when cols(y)==1 // BUGBUG maybe diag(quadcross()) is faster?
 	u = r
 
 	for (iter=1; iter<=S.maxiterations; iter++) {
 		(*T)(S, u, v, 1) // This is the hotest loop in the entire program
-		// BUGBUG: colsum or quadcolsum??
-		alpha = safe_divide( ssr , quadcolsum(u :* v) )
+		alpha = safe_divide( ssr , weighted_quadcolsum(S, u, v) )
 		recent_ssr[1 + mod(iter-1, d), .] = alpha :* ssr
 		improvement_potential = improvement_potential - alpha :* ssr
 		y = y - alpha :* u
 		r = r - alpha :* v
 		ssr_old = ssr
-		ssr = quadcolsum(r :* r)
+		ssr = weighted_quadcolsum(S, r, r)
 		beta = safe_divide( ssr , ssr_old) // Fletcher-Reeves formula, but it shouldn't matter in our problem
 		u = r + beta :* u
 		// Convergence if sum(recent_ssr) > tol^2 * improvement_potential
@@ -1130,8 +1155,8 @@ void function map_solve(`Problem' S, `Varlist' vars,
 	for (iter=1; iter<=S.maxiterations; iter++) {
 		(*T)(S, y, proj, 1)
 		if (check_convergence(S, iter, y-proj, y)) break
-		t = safe_divide( quadcolsum(y :* proj) , quadcolsum(proj :* proj) )
-		// if (uniform(1,1)<0.1) t = 1 // BUGBUG: Does this help to randomly unstuck an iteration?
+		t = safe_divide( weighted_quadcolsum(S, y, proj) , weighted_quadcolsum(S, proj, proj) )
+		if (uniform(1,1)<0.1) t = 1 // BUGBUG: Does this help to randomly unstuck an iteration?
 		y = y - t :* proj
 		
 		if (S.storing_betas) {
@@ -1175,7 +1200,7 @@ void function map_solve(`Problem' S, `Varlist' vars,
 		if (accelerate) {
 			delta_sq = resid - 2 * y + y_old // = (resid - y) - (y - y_old) // Equivalent to D2.resid
 			// t is just (d'd2) / (d2'd2)
-			t = safe_divide( quadcolsum( (resid - y) :* delta_sq) ,  quadcolsum(delta_sq :* delta_sq) )
+			t = safe_divide( weighted_quadcolsum(S,  (resid - y) , delta_sq) ,  weighted_quadcolsum(S, delta_sq , delta_sq) )
 			resid = resid - t :*  (resid - y)
 		}
 
@@ -1243,10 +1268,27 @@ void function map_solve(`Problem' S, `Varlist' vars,
 			printf("{txt}.")
 			displayflush()
 		}
-		if (S.verbose>=2 & S.verbose<=3 & mod(iter,100)==0) printf("{txt}%9.1f\n", update_error/S.tolerance)
-		if (S.verbose==4) printf("{txt} iter={res}%4.0f{txt}\tupdate_error={res}%-9.6e\n", iter, update_error)
+		if ( (S.verbose>=2 & S.verbose<=3 & mod(iter,100)==0) | (S.verbose==1 & mod(iter,10000)==0) ) printf("{txt}%9.1f\n", update_error/S.tolerance)
+
+		if (S.verbose==4 & method!="hestenes") printf("{txt} iter={res}%4.0f{txt}\tupdate_error={res}%-9.6e\n", iter, update_error)
+		if (S.verbose==4 & method=="hestenes") printf("{txt} iter={res}%4.0f{txt}\tupdate_error={res}%-9.6e  {txt}ssr={res}%g\n", iter, update_error, y_new)
+		
+		if (S.verbose==5) {
+			printf("\n{txt} iter={res}%4.0f{txt}\tupdate_error={res}%-9.6e{txt}\tmethod={res}%s\n", iter, update_error, method)
+			"old:"
+			y_old
+			"new:"
+			y_new
+		}
 	}
 	return(done)
+}
+
+// -------------------------------------------------------------------------------------------------
+
+`Matrix' weighted_quadcolsum(`Problem' S, `Matrix' x, `Matrix' y) {
+	// BUGBUG: colsum or quadcolsum??
+		return( quadcolsum(S.weightvar=="" ? (x :* y) : (x :* y :* S.w) ) )
 }
 	
 // -------------------------------------------------------------------------------------------------

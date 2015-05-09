@@ -46,5 +46,7 @@ struct MapProblem {
 	`Varname'		grouplabel
 	`Series'		groupseries		// The actual data of the mobility group variable
 	`Series'		uid
+	`Series'		resid
+	`Varname'		residname
 }
 end

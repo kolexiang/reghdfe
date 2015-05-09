@@ -43,23 +43,22 @@ mata set matastrict on
 	// A discussion on the stopping criteria used is described in
 	// http://scicomp.stackexchange.com/questions/582/stopping-criteria-for-iterative-linear-solvers-applied-to-nearly-singular-system/585#585
 
-	improvement_potential = quadcolsum(y :* y)
+	improvement_potential = weighted_quadcolsum(S, y, y)
 	recent_ssr = J(d, Q, .)
 	
 	(*T)(S, y, r, 1)
-	ssr = quadcolsum(r :* r) // cross(r,r) when cols(y)==1 // BUGBUG maybe diag(quadcross()) is faster?
+	ssr = weighted_quadcolsum(S, r, r) // cross(r,r) when cols(y)==1 // BUGBUG maybe diag(quadcross()) is faster?
 	u = r
 
 	for (iter=1; iter<=S.maxiterations; iter++) {
 		(*T)(S, u, v, 1) // This is the hotest loop in the entire program
-		// BUGBUG: colsum or quadcolsum??
-		alpha = safe_divide( ssr , quadcolsum(u :* v) )
+		alpha = safe_divide( ssr , weighted_quadcolsum(S, u, v) )
 		recent_ssr[1 + mod(iter-1, d), .] = alpha :* ssr
 		improvement_potential = improvement_potential - alpha :* ssr
 		y = y - alpha :* u
 		r = r - alpha :* v
 		ssr_old = ssr
-		ssr = quadcolsum(r :* r)
+		ssr = weighted_quadcolsum(S, r, r)
 		beta = safe_divide( ssr , ssr_old) // Fletcher-Reeves formula, but it shouldn't matter in our problem
 		u = r + beta :* u
 		// Convergence if sum(recent_ssr) > tol^2 * improvement_potential
@@ -79,8 +78,8 @@ mata set matastrict on
 	for (iter=1; iter<=S.maxiterations; iter++) {
 		(*T)(S, y, proj, 1)
 		if (check_convergence(S, iter, y-proj, y)) break
-		t = safe_divide( quadcolsum(y :* proj) , quadcolsum(proj :* proj) )
-		// if (uniform(1,1)<0.1) t = 1 // BUGBUG: Does this help to randomly unstuck an iteration?
+		t = safe_divide( weighted_quadcolsum(S, y, proj) , weighted_quadcolsum(S, proj, proj) )
+		if (uniform(1,1)<0.1) t = 1 // BUGBUG: Does this help to randomly unstuck an iteration?
 		y = y - t :* proj
 		
 		if (S.storing_betas) {
@@ -124,7 +123,7 @@ mata set matastrict on
 		if (accelerate) {
 			delta_sq = resid - 2 * y + y_old // = (resid - y) - (y - y_old) // Equivalent to D2.resid
 			// t is just (d'd2) / (d2'd2)
-			t = safe_divide( quadcolsum( (resid - y) :* delta_sq) ,  quadcolsum(delta_sq :* delta_sq) )
+			t = safe_divide( weighted_quadcolsum(S,  (resid - y) , delta_sq) ,  weighted_quadcolsum(S, delta_sq , delta_sq) )
 			resid = resid - t :*  (resid - y)
 		}
 
@@ -192,9 +191,26 @@ mata set matastrict on
 			printf("{txt}.")
 			displayflush()
 		}
-		if (S.verbose>=2 & S.verbose<=3 & mod(iter,100)==0) printf("{txt}%9.1f\n", update_error/S.tolerance)
-		if (S.verbose==4) printf("{txt} iter={res}%4.0f{txt}\tupdate_error={res}%-9.6e\n", iter, update_error)
+		if ( (S.verbose>=2 & S.verbose<=3 & mod(iter,100)==0) | (S.verbose==1 & mod(iter,10000)==0) ) printf("{txt}%9.1f\n", update_error/S.tolerance)
+
+		if (S.verbose==4 & method!="hestenes") printf("{txt} iter={res}%4.0f{txt}\tupdate_error={res}%-9.6e\n", iter, update_error)
+		if (S.verbose==4 & method=="hestenes") printf("{txt} iter={res}%4.0f{txt}\tupdate_error={res}%-9.6e  {txt}ssr={res}%g\n", iter, update_error, y_new)
+		
+		if (S.verbose==5) {
+			printf("\n{txt} iter={res}%4.0f{txt}\tupdate_error={res}%-9.6e{txt}\tmethod={res}%s\n", iter, update_error, method)
+			"old:"
+			y_old
+			"new:"
+			y_new
+		}
 	}
 	return(done)
+}
+
+// -------------------------------------------------------------------------------------------------
+
+`Matrix' weighted_quadcolsum(`Problem' S, `Matrix' x, `Matrix' y) {
+	// BUGBUG: colsum or quadcolsum??
+		return( quadcolsum(S.weightvar=="" ? (x :* y) : (x :* y :* S.w) ) )
 }
 end

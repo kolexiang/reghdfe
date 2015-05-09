@@ -38,6 +38,10 @@ program define RunMany
 	args rep
 	RunOnce // Warm up (load ADOs into memory, etc)
 	* reghdfe // replay
+	
+	di
+	reghdfe, version
+
 	tic
 	forval i = 1/`rep' {
 		di as text "." _c
@@ -53,8 +57,8 @@ clear
 // -------------------------------------------------------------------------------------------------
 
 
-local fn 2e6 // 1e5 2e6 1e7 1e8
-local reps 2
+local fn 1e5 // 1e5 2e6 1e7 1e8
+local reps 5
 local versions 	/// working ///
 				master /// current
 				mata /// ALPHA VERSION

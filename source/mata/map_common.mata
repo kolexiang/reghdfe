@@ -13,6 +13,8 @@ void verbose2local(`Problem' S, string scalar loc) {
 	st_local(loc, strofreal(S.verbose))
 }
 
+// -------------------------------------------------------------------------------------------------
+
 void function store_uid(`Problem' S, `Varname' varname) {
 	S.uid = st_data(., varname)
 	assert_msg(rows(S.uid)==S.N, "assertion failed: rows(S.uid)==S.N")
@@ -21,6 +23,22 @@ void function store_uid(`Problem' S, `Varname' varname) {
 void function drop_uid(`Problem' S) {
 	S.uid = J(0,0,.)
 }
+
+// -------------------------------------------------------------------------------------------------
+
+void function store_resid(`Problem' S, `Varname' varname) {
+	S.resid = st_data(., varname)
+	S.residname = varname
+	assert_msg(rows(S.resid)==S.N, "assertion failed: rows(S.resid)==S.N")
+}
+
+void function resid2dta(`Problem' S) {
+	st_store(., st_addvar("double", S.residname), S.resid)
+	S.resid = J(0,0,.)
+	S.residname = ""
+}
+
+// -------------------------------------------------------------------------------------------------
 
 void function groupvar2dta(`Problem' S) {
 	if (S.groupvar!="") {
@@ -36,6 +54,8 @@ void function groupvar2dta(`Problem' S) {
 	}
 }
 
+// -------------------------------------------------------------------------------------------------
+
 void function drop_ids(`Problem' S) {
 	`Integer' g
 	for (g=1;g<=S.G;g++) {
@@ -43,10 +63,14 @@ void function drop_ids(`Problem' S) {
 	}
 }
 
+// -------------------------------------------------------------------------------------------------
+
 void function esample2dta(`Problem' S, `Varname' esample) {
 	assert(length(S.uid)>0)
 	st_store(S.uid, st_addvar("byte", esample), J(rows(S.uid),1,1) )
 }
+
+// -------------------------------------------------------------------------------------------------
 
 // Copy the fixed effect estimates (the alphas back into the original dataset)
 void function alphas2dta(`Problem' S) {
@@ -68,4 +92,5 @@ void function alphas2dta(`Problem' S) {
 		}
 	}
 }
+
 end
