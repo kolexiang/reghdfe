@@ -35,7 +35,8 @@ di e(df_a)
 di e(df_r)
 reghdfe y x, absorb(i j)  keepsingletons
 di e(df_r)
-reghdfe y x, absorb(i j)
+cap noi reghdfe y x, absorb(i j)
+assert c(rc)==2001
 di e(df_r)
 reghdfe y x, absorb(i j)  keepsingletons
 di e(df_r)

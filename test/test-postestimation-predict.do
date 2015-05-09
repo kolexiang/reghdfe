@@ -46,6 +46,7 @@ noi cscript "reghdfe postestimation: predict" adofile reghdfe
 
 	* 1. Run benchmark
 	areg `lhs' `rhs', absorb(`absvars')
+	di e(df_a)
 	TrimMatrix `K'
 	local bench_df_a = e(df_a)
 	storedresults save bench_e e()
@@ -61,7 +62,7 @@ noi cscript "reghdfe postestimation: predict" adofile reghdfe
 
 	* 2. Run reghdfe and compare
 	
-	reghdfe `lhs' `rhs', absorb(FE=`absvars') vce(, suite(default))
+	reghdfe `lhs' `rhs', absorb(FE=`absvars') vce(, suite(default)) keepsingletons
 	TrimMatrix `K'
 	assert `bench_df_a'==e(df_a)-1
 	storedresults compare bench_e e(), tol(1e-10) include(`included_e') // Note the lowered tol
@@ -70,7 +71,6 @@ noi cscript "reghdfe postestimation: predict" adofile reghdfe
 	predict double xbd_test, xbd
 	predict double resid_test, resid
 	*su d d_test xb xb_test xbd xbd_test resid resid_test, sep(2)
-
 
 	_vassert xb xb_test, tol(1e-10)
 	_vassert d d_test, tol(1e-10)
@@ -89,14 +89,18 @@ noi cscript "reghdfe postestimation: predict" adofile reghdfe
 	drop FE alt resid
 
 	* 4) Test that the means of resid are zero , with #c. interactions
-	di as error "WARNING: Note the numerical inaccuracy of interacting with c.vars" // this is for step 5)
-	reghdfe price weight, a(turn trunk##c.gear, save) tol(1e-12)
+	// di as error "WARNING: Note the numerical inaccuracy of interacting with c.vars" // this is for step 5)
+	drop d xbd xb 
+	reghdfe price weight, a(turn trunk##c.gear, save) tol(1e-12) keepsingletons
 	predict double resid, resid
+	predict double d, d
+	predict double xbd, xbd
+	su d xbd
 	su resid
 	assert abs(r(mean))<1e-8
 
 	* 5) Check that the means match
-	 areg price weight ibn.trunk##c.gear, a(turn)
+	areg price weight ibn.trunk##c.gear, a(turn)
 	predict double resid_bench, resid
 	corr resid resid_bench
 	su resid*

@@ -22,6 +22,14 @@
 	set tracedepth 5
 	set varabbrev on
 
+
+	run test-postestimation-predict
+	run test-postestimation-test
+	run test-attach
+
+
+	
+
 	run test-unadjusted
 	run test-robust
 	run test-cluster
@@ -41,7 +49,6 @@
 	run test-gmm
 	* Doesn't work: run test-cue
 	run test-liml
-
 	// run test-singletons
 	run test-iv
 	run test-slope
@@ -49,9 +56,7 @@
 	run test-rank
 	
 	
-	run test-postestimation-test
-	run test-postestimation-predict
-	run test-attach
+
 
 	* BUGGED:
 	run test-avar

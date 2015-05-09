@@ -9,12 +9,16 @@ cscript "reghdfe clustering and absorbing by the same variable" adofile reghdfe
 * Convenience: "Trim <size>" will trim e(b) and e(V)
 	capture program drop TrimMatrix
 	program define TrimMatrix, eclass
-	args size
+	args size adjdof
 		assert `size'>0
 		matrix trim_b = e(b)
 		matrix trim_V = e(V)
 		matrix trim_b = trim_b[1, 1..`size']
 		matrix trim_V = trim_V[1..`size',1..`size']
+		if ("`adjdof'"!="") {
+			matrix trim_V = trim_V * `adjdof'
+			ereturn scalar F = e(F) / `adjdof'
+		}
 		ereturn matrix trim_b = trim_b
 		ereturn matrix trim_V = trim_V
 	end
@@ -73,7 +77,11 @@ cscript "reghdfe clustering and absorbing by the same variable" adofile reghdfe
 	* 2. Run reghdfe
 	* To match -areg- we need to have dof(none)!
 	reghdfe `lhs' `rhs', absorb(`absvars') vce(cluster `clustervar') keepsingletons
-	TrimMatrix `K'
+	* IMPORTANT NOTE:
+	* XTREG considers the constant when computing their "unclustered_df_r"
+	* REGHDFE doesn't, because there is really no constant after demeaning wrt the FEs
+	local adjdof = e(unclustered_df_r) / (e(unclustered_df_r)-1)
+	TrimMatrix `K' `adjdof'
 	
 	* 3. Compare
 	* NOTE: I'm removing e(df_m) from the comparison b/c -xtreg,fe- acts crazy. See:
