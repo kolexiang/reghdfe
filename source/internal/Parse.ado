@@ -88,8 +88,8 @@ program define Parse
 		local will_save_fe = `r(will_save_fe)' // Returned from map_init()
 		local original_absvars = "`r(original_absvars)'"
 		local extended_absvars = "`r(extended_absvars)'"
-	
-	local allkeys `allkeys' absorb_keepvars N_hdfe will_save_fe original_absvars extended_absvars
+		local equation_d = "`r(equation_d)'"
+	local allkeys `allkeys' absorb_keepvars N_hdfe will_save_fe original_absvars extended_absvars equation_d
 
 	* Tell Mata what weightvar we have
 	if ("`weightvar'"!="") mata: map_init_weights(HDFE_S, "`weightvar'", "`weighttype'")

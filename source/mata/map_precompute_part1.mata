@@ -70,7 +70,7 @@ void map_precompute_part1(`Problem' S, transmorphic counter) {
 			singleton = sortedby? singleton : singleton[inv_p]
 			st_dropobsif(singleton)
 			if (!st_nobs()) {
-				printf("{err}\nno observations left after dropping singletons\n")
+				printf("{err}\nno observations left after dropping singletons (%f obs. dropped)\n", initial_N)
 				exit(error(2001))
 			}
 

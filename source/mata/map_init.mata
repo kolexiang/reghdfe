@@ -4,11 +4,13 @@ mata set matastrict on
 //  Parse absvars and initialize the almost empty MapProblem struct
 `Problem' function map_init()
 {
-	`Integer'		g, G, num_slopes, has_intercept, i
+	`Integer'		g, G, num_slopes, has_intercept, i, H, j
 	`Problem' 		S
 	`Boolean'		auto_target // Automatically assign target names to all FEs
 	`Varname'		basetarget
 	`Varlist'		target, original_absvars, extended_absvars
+	`String'		equation_d
+	`Boolean'		equation_d_valid
 	pointer(`FE') 	fe
 
 	S.weightvar = S.weighttype = S.weights = ""
@@ -86,6 +88,25 @@ mata set matastrict on
 			fe->target = target
 		}
 	}
+
+	equation_d_valid = 1
+	equation_d = ""
+	for (g=1; g<=S.G; g++) {
+		H = S.fes[g].has_intercept + S.fes[g].num_slopes
+		if (length(S.fes[g].target)==0) {
+			equation_d_valid = 0
+			break
+		}
+		assert(length(S.fes[g].target==H))
+
+		j = 0
+		for (i=1; i<=H;i++) {
+			equation_d = equation_d + sprintf("%s%s", equation_d=="" ? "" : " + ", S.fes[g].target[i])
+			if (i>1 | !S.fes[g].has_intercept) j++ // j is the cvar counter
+			if (j>0) equation_d = equation_d + sprintf(" * %s", S.fes[g].cvars[j])
+		}
+	}
+	if (equation_d_valid) st_global("r(equation_d)", invtokens(equation_d) )
 	
 	st_numscalar("r(will_save_fe)", S.will_save_fe)
 	st_global("r(original_absvars)", invtokens(original_absvars) )

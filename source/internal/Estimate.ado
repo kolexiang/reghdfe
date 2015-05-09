@@ -226,27 +226,40 @@ program define Estimate, eclass
 
 * (optional) Save FEs
 	if (`will_save_fe') {
-		Debug, level(2) msg("(calcualting fixed effects)")
+		Debug, level(2) msg("(calculating fixed effects)")
 		tempvar resid
 		local score = cond("`model'"=="ols", "score", "resid")
-		`subpredict' double `resid', `score' // equation: y = xb + d + e, we recovered "e"
+		Debug, level(3) msg(" - predicting resid (equation: y=xb+d+cons+resid)")
+		if e(df_m)>0 {
+			`subpredict' double `resid', `score' // equation: y = xb + d + e, we recovered "e"
+		}
+		else {
+			gen double `resid' = `depvar'
+		}
 		mata: store_resid(HDFE_S, "`resid'")
 		
+		Debug, level(3) msg(" - reloading untransformed dataset")
 		qui use "`untransformed'", clear
 		erase "`untransformed'"
 		mata: resid2dta(HDFE_S)
 
+		Debug, level(3) msg(" - predicting resid+d+cons (equation: y=xb+d+cons+resid)")
 		tempvar resid_d
-		`subpredict' double `resid_d', `score' // This is "d+e" (including constant)
+		if e(df_m)>0 {
+			`subpredict' double `resid_d', `score' // This is "d+e" (including constant)
+		}
+		else {
+			gen double `resid_d' = `depvar'
+		}
 
+		Debug, level(3) msg(" - computing d = resid_d - mean(resid_d) - resid")
+		tempvar d
 		if ("`weightvar'"!="") assert "`tmpweightexp'"!=""
 		su `resid_d' `tmpweightexp', mean
-		qui replace `resid_d' = `resid_d' - r(mean)
-		
-		tempvar d
-		gen double `d' = `resid_d' - `resid'
+		gen double `d' = `resid_d' - r(mean) - `resid'
 		drop `resid' `resid_d'
 		//clonevar dd = `d'
+		Debug, level(3) msg(" - disaggregating d = z1 + z2 + ...")
 		mata: map_solve(HDFE_S, "`d'", "", "", 1) // Store FEs in Mata (will fail if partial is set)
 		//regress dd __hdfe*, nocons
 		drop `d'
@@ -297,6 +310,7 @@ program define Estimate, eclass
 	ereturn local predict = "reghdfe_p"
 	ereturn local estat_cmd = "reghdfe_estat"
 	ereturn local footnote = "reghdfe_footnote"
+	ereturn `hidden' local equation_d = "`equation_d'" // The equation used to construct -d- (used to predict)
 	
 	ereturn local absvars = "`original_absvars'"
 	ereturn `hidden' local extended_absvars = "`extended_absvars'"
