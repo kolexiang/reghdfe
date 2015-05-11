@@ -1,4 +1,4 @@
-*! hdfe 3.0.223 11may2015
+*! hdfe 3.0.242 11may2015
 *! Sergio Correia (sergio.correia@duke.edu)
 
 
@@ -114,6 +114,8 @@ struct MapProblem {
 	`Varname'		panelvar
 	`Varname'		timevar
 	`Boolean'		vce_is_hac
+
+	`Varname' 		by 				// In case we are using reghdfe .. by()
 	
 	// Optimization parameters	
 	`Integer'		groupsize 		// Group variables when demeaning (more is faster but uses more memory)
@@ -243,7 +245,7 @@ void function alphas2dta(`Problem' S) {
 }
 	
 //  Parse absvars and initialize the almost empty MapProblem struct
-`Problem' function map_init()
+`Problem' function map_init(|`Varname' byvar)
 {
 	`Integer'		g, G, num_slopes, has_intercept, i, H, j
 	`Problem' 		S
@@ -254,6 +256,8 @@ void function alphas2dta(`Problem' S) {
 	`Boolean'		equation_d_valid
 	pointer(`FE') 	fe
 
+	if (args()<1) byvar = ""
+
 	S.weightvar = S.weighttype = S.weights = ""
 	S.verbose = 0
 	S.transform = "symmetric_kaczmarz" // cimmino ?
@@ -262,6 +266,7 @@ void function alphas2dta(`Problem' S) {
 	S.maxiterations = 1e4
 	S.accel_start = 6
 	S.groupsize = 10
+	S.by = byvar // Cannot be changed afterwards
 
 	// If clustering by timevar or panelvar and VCE is HAC, we CANNOT touch the clustervars to create compact ids!
 	S.timevar = ""
@@ -1418,12 +1423,15 @@ void function transform_rand_kaczmarz(`Problem' S, `Group' y, `Group' ans,| `Boo
 }
 	
 void map_estimate_dof(`Problem' S, string rowvector adjustments, 
-		| `Varname' groupvar) {
+		| `Varname' groupvar, `String' cond) {
 	`Boolean' adj_firstpairs, adj_pairwise, adj_clusters, adj_continuous, belongs, already_first_constant
 	string rowvector all_adjustments
 	`String' adj, label, basestring
 	`Integer' i, g, SuperG, h, M_due_to_nested, j, m, sum_levels
 	`Vector' M, M_is_exact, M_is_nested, is_slope, solved, prev_g, SubGs
+
+	// TODO - BY
+	// With by, I need to i) discard the first FE, ii) use only the `cond' sample in the calculations
 
 	// Parse list of adjustments/tricks to do
 	if (S.verbose>1) printf("\n")

@@ -28,7 +28,7 @@ program define Inner, eclass
 
 * COMPACT - Expand time and factor variables, and drop unused variables and obs.
 	local original_depvar "`depvar'"
-	Compact, basevars(`basevars') depvar(`depvar') indepvars(`indepvars') endogvars(`endogvars') instruments(`instruments') uid(`uid') timevar(`timevar') panelvar(`panelvar') weightvar(`weightvar') absorb_keepvars(`absorb_keepvars') clustervars(`clustervars') if(`if') in(`in') by(`by') verbose(`verbose') vceextra(`vceextra')
+	Compact, basevars(`basevars') depvar(`depvar') indepvars(`indepvars') endogvars(`endogvars') instruments(`instruments') uid(`uid') timevar(`timevar') panelvar(`panelvar') weightvar(`weightvar') absorb_keepvars(`absorb_keepvars') clustervars(`clustervars') if(`if') in(`in') verbose(`verbose') vceextra(`vceextra')
 	// Injects locals: depvar indepvars endogvars instruments expandedvars
 
 * PRECOMPUTE MATA OBJECTS (means, counts, etc.)

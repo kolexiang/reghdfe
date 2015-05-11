@@ -34,13 +34,22 @@ program define InnerUseCache, eclass
 		local vceoption : subinstr local vceoption "<CLUSTERVARS>" "$updated_clustervars"
 	}
 
-* PREPARE - Compute untransformed tss, R2 of eqn w/out FEs
-	mata: st_local("tss", strofreal(asarray(tss_cache, "`depvar'")))
-	Assert `tss'<., msg("tss of depvar `depvar' not found in cache")
-	foreach var of local endogvars {
-		mata: st_local("tss_`var'", strofreal(asarray(tss_cache, "`var'")))
+* LEVEL check
+	if ("`by'"!="") {
+		cap cou if `by'==`level'
+		Assert r(N)>0 , msg("reghdfe by() error: there are no cases where `by'==`level'")
+		local cond if `by'==`level'
 	}
-	local r2c = . // BUGBUG!!!
+
+* PREPARE - Compute untransformed tss, R2 of eqn w/out FEs
+	if ("`by'"=="") {
+		mata: st_local("tss", strofreal(asarray(tss_cache, "`depvar'")))
+		Assert `tss'<., msg("tss of depvar `depvar' not found in cache")
+		foreach var of local endogvars {
+			mata: st_local("tss_`var'", strofreal(asarray(tss_cache, "`var'")))
+		}
+		local r2c = . // BUGBUG!!!
+	}
 
 * STAGES SETUP - Deal with different stages
 	assert "`stages'"!=""
@@ -101,7 +110,7 @@ foreach lhs_endogvar of local lhs_endogvars {
 
 * COMPUTE DOF
 * NOTE: could move this to before backup untransformed variables for the stages=none case!!!
-	mata: map_estimate_dof(HDFE_S, "`dofadjustments'", "`groupvar'") // requires the IDs
+	mata: map_estimate_dof(HDFE_S, "`dofadjustments'", "`groupvar'", "`cond'") // requires the IDs
 	assert e(df_a)<. // estimate_dof() only sets e(df_a); ereturn_dof() is for setting everything aferwards
 	local kk = e(df_a) // we need this for the regression step
 
@@ -114,7 +123,7 @@ foreach lhs_endogvar of local lhs_endogvars {
 	if (!inlist("`stage'","none", "iv")) local wrapper "Wrapper_avar" // Compatible with ivreg2
 	Debug, level(3) msg(_n "call to wrapper:" _n as result "`wrapper', `options'")
 	local opt_list
-	local opts ///
+	local opts /// cond // BUGUBG: Add by() (cond) options
 		depvar indepvars endogvars instruments ///
 		vceoption vcetype vcesuite ///
 		kk suboptions showraw vceunadjusted first weightexp ///
@@ -165,7 +174,9 @@ foreach lhs_endogvar of local lhs_endogvars {
 } // stage
 
 * ATTACH - Add e(stats) and e(notes)
-	cap conf matrix reghdfe_statsmatrix
-	if (!c(rc)) local statsmatrix reghdfe_statsmatrix
-	Attach, notes(`notes') statsmatrix(`statsmatrix') summarize_quietly(`summarize_quietly') // Attach only once, not per stage
+	if ("`by'"=="") {
+		cap conf matrix reghdfe_statsmatrix
+		if (!c(rc)) local statsmatrix reghdfe_statsmatrix
+		Attach, notes(`notes') statsmatrix(`statsmatrix') summarize_quietly(`summarize_quietly') // Attach only once, not per stage
+	}
 end

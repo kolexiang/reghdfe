@@ -1,12 +1,15 @@
 mata:
 mata set matastrict on
 void map_estimate_dof(`Problem' S, string rowvector adjustments, 
-		| `Varname' groupvar) {
+		| `Varname' groupvar, `String' cond) {
 	`Boolean' adj_firstpairs, adj_pairwise, adj_clusters, adj_continuous, belongs, already_first_constant
 	string rowvector all_adjustments
 	`String' adj, label, basestring
 	`Integer' i, g, SuperG, h, M_due_to_nested, j, m, sum_levels
 	`Vector' M, M_is_exact, M_is_nested, is_slope, solved, prev_g, SubGs
+
+	// TODO - BY
+	// With by, I need to i) discard the first FE, ii) use only the `cond' sample in the calculations
 
 	// Parse list of adjustments/tricks to do
 	if (S.verbose>1) printf("\n")

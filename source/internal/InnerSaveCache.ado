@@ -18,28 +18,39 @@ program define InnerSaveCache, eclass
 	* The cache option of ExpandFactorVariables (called from Compact.ado)
 
 * COMPACT - Expand time and factor variables, and drop unused variables and obs.
-	Compact, basevars(`basevars') depvar(`depvar' `indepvars') uid(`uid') timevar(`timevar') panelvar(`panelvar') weightvar(`weightvar') absorb_keepvars(`absorb_keepvars') clustervars(`clustervars') if(`if') in(`in') by(`by') verbose(`verbose') vceextra(`vceextra') savecache(1)
+	Compact, basevars(`basevars') depvar(`depvar' `indepvars') uid(`uid') timevar(`timevar') panelvar(`panelvar') weightvar(`weightvar') absorb_keepvars(`absorb_keepvars') clustervars(`clustervars') if(`if') in(`in') verbose(`verbose') vceextra(`vceextra') savecache(1)
 	// Injects locals: depvar indepvars endogvars instruments expandedvars cachevars
 
 * PRECOMPUTE MATA OBJECTS (means, counts, etc.)
-	mata: map_init_keepvars(HDFE_S, "`expandedvars' `uid' `cachevars'") 	// Non-essential vars will be deleted (e.g. interactions of a clustervar)
+	mata: map_init_keepvars(HDFE_S, "`expandedvars' `uid' `cachevars' `by'") 	// Non-essential vars will be deleted (e.g. interactions of a clustervar)
 	mata: map_precompute(HDFE_S)
 	global updated_clustervars = "`r(updated_clustervars)'"
 	
+* STORE BY LEVELS
+	if ("`by'"!="") {
+		qui levelsof `by'
+		ereturn local levels `r(levels)'
+	}
+
 * PREPARE - Compute untransformed tss *OF ALL THE VARIABLES*
 	mata: tss_cache = asarray_create()
 	mata: asarray_notfound(tss_cache, .)
 	local tmpweightexp = subinstr("`weightexp'", "[pweight=", "[aweight=", 1)
-	foreach var of local expandedvars {
-		qui su `var' `tmpweightexp' // BUGBUG: Is this correct?!
-		local tss = r(Var)*(r(N)-1)
-		mata: asarray(tss_cache, "`var'", `tss')
+	if ("`by'"=="") {
+		foreach var of local expandedvars {
+			qui su `var' `tmpweightexp' // BUGBUG: Is this correct?!
+			local tss = r(Var)*(r(N)-1)
+			mata: asarray(tss_cache, "`var'", `tss')
+		}		
+	}
+	else {
+		// ...
 	}
 	*NOTE: r2c is too slow and thus won't be saved
 	*ALTERNATIVE: Allow a varlist of the form (depvars) (indepvars) and only compute for those
 
 * COMPUTE e(stats) - Summary statistics for the all the regression variables
-	if ("`stats'"!="") {
+	if ("`stats'"!="" & "`by'"=="") {
 		local tabstat_weight : subinstr local weightexp "[pweight" "[aweight"
 		qui tabstat `expandedvars' `tabstat_weight' , stat(`stats') col(stat) save
 		matrix reghdfe_statsmatrix = r(StatTotal)
@@ -53,4 +64,5 @@ program define InnerSaveCache, eclass
 
 * This was in -parse- but we are dropping observations through the code
 	char _dta[cache_obs] `c(N)'
+
 end

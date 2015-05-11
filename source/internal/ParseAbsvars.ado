@@ -1,11 +1,13 @@
 capture program drop ParseAbsvars
 program define ParseAbsvars, rclass
-syntax anything(id="absvars" name=absvars equalok everything), [SAVEfe] // [CLUSTERvars(varlist numeric fv)]
+syntax anything(id="absvars" name=absvars equalok everything), [SAVEfe] [BY(varname)] // [CLUSTERvars(varlist numeric fv)]
 	* Logic: split absvars -> expand each into factors -> split each into parts
 
 	local g 0
 	local all_cvars
 	local all_ivars
+
+	if ("`by'"!="") local absvars `by' `absvars'
 
 	while ("`absvars'"!="") {
 		local ++g
@@ -28,6 +30,8 @@ syntax anything(id="absvars" name=absvars equalok everything), [SAVEfe] // [CLUS
 		
 		local ivars
 		local cvars
+		if ("`absvar'"!="`by'") local ivars `by' // Default start
+		
 		local has_intercept 0
 		foreach factor of local varlist {
 			local hasdot = strpos("`factor'", ".")
