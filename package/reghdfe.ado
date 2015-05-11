@@ -1,4 +1,4 @@
-*! hdfe 3.0.242 11may2015
+*! hdfe 3.0.1 11may2015
 *! Sergio Correia (sergio.correia@duke.edu)
 
 
@@ -1886,7 +1886,7 @@ end
 // -------------------------------------------------------------
 
 program define Version, eclass
-    local version "3.0.242 11may2015"
+    local version "3.0.1 11may2015"
     ereturn clear
     di as text "`version'"
     ereturn local version "`version'"
