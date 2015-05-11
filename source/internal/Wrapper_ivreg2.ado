@@ -65,28 +65,27 @@ program define Wrapper_ivreg2, eclass
 		ereturn local firsteqs
 	}
 
-	foreach cat in exexog insts instd {
+	foreach cat in exexog insts instd exexog1 instd1 collin {
 		FixVarnames `e(`cat')'
 		ereturn local `cat' = "`r(newnames)'"
 	}
 
 	if (`first') {
-		* May be a problem if we ran out of space for storing estimates
 		local ivreg2_firsteqs "`e(ivreg2_firsteqs)'"
 		tempname hold
 		estimates store `hold' , nocopy
 		foreach fs_eqn in `ivreg2_firsteqs' {
 			qui estimates restore `fs_eqn'
 			FixVarnames `e(depvar)'
-			ereturn local depvar = r(prettynames)
+			ereturn local depvar = r(newnames)
 			FixVarnames `e(inexog)'
-			ereturn local inexog = r(prettynames)
+			ereturn local inexog = r(newnames)
 
 			tempname b
 			matrix `b' = e(b)
 			local backup_colnames : colnames `b'
 			FixVarnames `backup_colnames'
-			matrix colnames `b' = `r(prettynames)' // newnames? prettynames?
+			matrix colnames `b' = `r(newnames)'
 			ereturn repost b=`b', rename
 
 			estimates store `fs_eqn', nocopy

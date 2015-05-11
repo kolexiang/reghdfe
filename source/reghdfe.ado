@@ -39,6 +39,37 @@ program define reghdfe
 		exit
 	}
 
+* Intercept savecache
+	cap syntax anything(everything) [fw aw pw/], [*] SAVEcache
+	if !c(rc) {
+		cap noi InnerSaveCache `0'
+		if (c(rc)) {
+			local rc = c(rc)
+			cap mata: mata drop HDFE_S // overwrites c(rc)
+			global updated_clustervars
+			exit `rc'
+		}
+	}
+
+* Intercept usecache
+	cap syntax anything(everything) [fw aw pw/], [*] USEcache
+	if !c(rc) {
+		cap noi InnerUseCache `0'
+		if (c(rc)) {
+			local rc = c(rc)
+			cap mata: mata drop HDFE_S // overwrites c(rc)
+			global updated_clustervars
+			exit `rc'
+		}
+	}
+
+* Intercept cleanup of cache
+	cap syntax anything(everything) [fw aw pw/], [*] CLEANupcache
+	if !c(rc) {
+		cap mata: mata drop HDFE_S // overwrites c(rc)
+		global updated_clustervars
+	}
+
 * Finally, call Inner
 	cap noi Inner `0'
 	if (c(rc)) {
@@ -59,6 +90,7 @@ include "internal/Inner.ado"
 		include "internal/ParseAbsvars.ado"
 		include "internal/ParseDOF.ado"
 		include "internal/ParseImplicit.ado"
+	include "internal/GenUID.ado"
 	include "internal/Compact.ado"
 		include "internal/ExpandFactorVariables.ado"
 	include "internal/Prepare.ado"
@@ -75,4 +107,5 @@ include "internal/Inner.ado"
 	include "internal/Attach.ado"
 include "internal/Replay.ado"
 	include "internal/Header.ado"
+include "internal/InnerSaveCache.ado"
 // -------------------------------------------------------------------------------------------------

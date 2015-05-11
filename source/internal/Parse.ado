@@ -163,6 +163,21 @@ program define Parse
 	}
 	local allkeys `allkeys' fast savecache usecache by level
 
+* Sanity checks on speedups
+	Assert `usecache' + `savecache' < 2, msg("savecache and usecache are mutually exclusive")
+	if (`savecache') {
+		Assert "`endogvars'`instruments'"=="", msg("savecache option requires a normal varlist, not an iv varlist")
+		char _dta[reghdfe_cache] 1
+		char _dta[cache_obs] `c(N)'
+		char _dta[cache_absvars] `original_absvars'
+	}
+	else if (`usecache') {
+		local is_cache : char _dta[reghdfe_cache]
+		Assert "`is_cache'"=="1" , msg("usecache requires a previous savecache operation")
+		local cache_obs : char _dta[obs]
+		Assert `cache_obs'==c(N), msg("dataset cannot change after savecache")
+		Assert "`cache_absvars'"=="`original_absvars'", msg("cache dataset has different absvars")
+	}
 
 * Nested
 	local nested = cond("`nested'"!="", 1, 0) // 1=Yes
@@ -173,6 +188,7 @@ program define Parse
 
 * Stages
 	assert "`model'"!="" // just to be sure this goes after `model' is set
+	if ("`stages'"=="all") local stages iv ols first acid reduced
 	local iv_stage iv
 	local stages : list stages - iv_stage
 	local valid_stages ols first acid reduced
@@ -192,7 +208,6 @@ program define Parse
 	Assert `"`options'"'=="", msg(`"invalid options: `options'"')
 	if ("`hascons'`tsscons'"!="") di in ye "(option `hascons'`tsscons' ignored)"
 	local allkeys `allkeys' diopts
-
 
 * Other keys:
 	local allkeys `allkeys' suboptions notes
