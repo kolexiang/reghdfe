@@ -93,12 +93,12 @@ di as text _n "{hline `WX'}{c +}{hline 49}{c RT}"  // {c +}{hline 14}"
 
 		di as text %`skip1's "`fe'" " {c |}" _continue
 		local numcoefs = e(K`i') - e(M`i')
-
-		local note = cond(e(M`i'_exact)==0, "?", " ")
+		assert `numcoefs'<. & `numcoefs'>=0
+		local note = cond(`e(M`i'_exact)'==0, "?", " ")
 		if ("`note'"=="?") {
 			local explain_exact 1
 		}
-		else if (e(M`i'_nested)==1) {
+		else if (`e(M`i'_nested)'==1) {
 			local note *
 			local explain_nested 1
 		}

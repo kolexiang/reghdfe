@@ -1,4 +1,4 @@
-*! hdfe 3.0.339 09may2015
+*! hdfe 3.0.1 10may2015
 *! Sergio Correia (sergio.correia@duke.edu)
 
 
@@ -138,6 +138,16 @@ struct MapProblem {
 	`Series'		uid
 	`Series'		resid
 	`Varname'		residname
+
+	// Temporary storage for DoFs
+	`Integer'		dof_M
+	`Integer'		dof_M_due_to_nested
+	`Integer'		dof_KminusM
+	`Integer'		dof_N_hdfe_extended
+	`Vector'		doflist_M
+	`Vector'		doflist_M_is_exact
+	`Vector'		doflist_M_is_nested
+	`Vector'		dof_SubGs
 }
 	
 real rowvector safe_divide(real rowvector numerator, real rowvector denominator, | real scalar epsi) {
@@ -217,7 +227,7 @@ void function alphas2dta(`Problem' S) {
 	`Varlist' target
 	`String' varlabel
 	assert(S.will_save_fe==1)
-	if (S.verbose>1) printf("{txt}    - Storing fixed effects in the original dataset\n", S.groupvar)
+	if (S.verbose>1) printf("{txt}    - Storing fixed effects in the original dataset\n")
 	for (g=1; g<=S.G; g++) {
 		target = S.fes[g].target
 		if (length(target)>0) {
@@ -997,6 +1007,7 @@ void function map_solve(`Problem' S, `Varlist' vars,
 	`FunctionPointer' transform, accelerate
 	real rowvector stdevs
 	`Varlist'	target
+	`Varlist'	chars
 
 	if (S.verbose>0) printf("{txt}{bf:mata: map_solve()}\n")
 	assert_msg(S.N!=., "map_solve() needs to be run after map_precompute()")
@@ -1008,6 +1019,13 @@ void function map_solve(`Problem' S, `Varlist' vars,
 	vars = tokens(vars)
 	y = st_data(., vars)
 	Q = cols(y)
+
+	// Store chars var[name] that contain the original varname (e.g. L.var)
+	chars = J(1, Q, "")
+	for (i=1;i<=Q;i++) {
+		chars[i] = st_global(sprintf("%s[name]", vars[i]))
+	}
+
 	st_dropvar(vars) // We need the new ones on double precision
 
 	if (args()<3 | newvars=="") newvars = vars
@@ -1098,8 +1116,14 @@ void function map_solve(`Problem' S, `Varlist' vars,
 	}
 
 	if (S.verbose>1) printf("{txt} - Saving transformed variables\n")
+	
 	// BUGBUG: This will use 2x memory for a while; partition the copy+drop based on S.groupsize?
 	st_store(., st_addvar("double", newvars), y :* stdevs)
+	y = J(0,0,.) // clear space
+
+	for (i=1;i<=Q;i++) {
+		st_global(sprintf("%s[name]", newvars[i]), chars[i])
+	}
 
 	// Store FEs
 	if (save_fe) {
@@ -1529,25 +1553,29 @@ void map_estimate_dof(`Problem' S, string rowvector adjustments,
 		}
 	}
 
-	// Report and return final results
-	st_rclear()
-	st_numscalar("r(M)", sum(M))
-	st_numscalar("r(M_due_to_nested)", M_due_to_nested)
+	// Store results
+	S.dof_SubGs = SubGs
+	
+	S.doflist_M = M
+	S.doflist_M_is_exact = M_is_exact
+	S.doflist_M_is_nested = M_is_nested
+
 	sum_levels = 0
 	for (g=1;g<=S.G;g++) sum_levels = sum_levels + S.fes[g].levels * (S.fes[g].has_intercept + S.fes[g].num_slopes)
-	st_numscalar("r(df_a)", sum_levels - sum(M))
+	S.dof_M = sum(M)
+	S.dof_KminusM = sum_levels - S.dof_M
+	S.dof_M_due_to_nested = M_due_to_nested
+	S.dof_N_hdfe_extended = SuperG
 
-	h = 0
-	if (S.verbose>=2) printf("{txt} - Degrees-of-freedom used by each fixed effect (K=total levels; M=redundant levels)\n")
-	for (g=1;g<=S.G;g++) {
-		for (i=1;i<=SubGs[g];i++) {
-			h++
-			st_numscalar(sprintf("r(M%f)",h), M[h])
-			st_numscalar(sprintf("r(G%f)",h), g)
-			st_numscalar(sprintf("r(M%f_exact)",h), M_is_exact[h])
-			st_numscalar(sprintf("r(M%f_nested)",h), M_is_nested[h])
-			st_numscalar(sprintf("r(K%f)",h), S.fes[g].levels)
-			if (S.verbose>=2) {
+	st_numscalar("e(df_a)", S.dof_KminusM) // We need this in the regression stage!
+
+	// Report results
+	if (S.verbose>=2) {
+		printf("{txt} - Degrees-of-freedom used by each fixed effect (K=total levels; M=redundant levels)\n")
+		h = 0
+		for (g=1;g<=S.G;g++) {
+			for (i=1;i<=SubGs[g];i++) {
+				h++
 				label = invtokens(S.fes[g].ivars, "#")
 				if (i>S.fes[g].has_intercept) label = label + "#c." + S.fes[g].cvars[i-S.fes[g].has_intercept]
 				basestring = "{txt}   - FE%f ({res}%s{txt}): {col 40}K=%f {col 50}M=%f {col 60}is_exact=%f\n"
@@ -1555,9 +1583,37 @@ void map_estimate_dof(`Problem' S, string rowvector adjustments,
 			}
 		}
 	}
-	st_numscalar("r(N_hdfe_extended)", SuperG)
-
 	if (S.verbose>0) printf(" - Results: N=%f ; K=%f ; M=%f ; (K-M)==df_a=%f\n", S.N, sum_levels, sum(M), sum_levels-sum(M))
+}
+// -------------------------------------------------------------------------------------------------
+
+void function map_ereturn_dof(`Problem' S) {
+	`Integer' h, g
+
+	st_numscalar("e(N_hdfe)", S.G)
+	st_numscalar("e(N_hdfe_extended)", S.dof_N_hdfe_extended)
+	st_numscalar("e(mobility)", S.dof_M)
+	st_numscalar("e(M_due_to_nested)", S.dof_M_due_to_nested)
+	st_numscalar("e(df_a)", S.dof_KminusM)
+
+	h = 0
+	for (g=1;g<=S.G;g++) {
+		for (i=1;i<=S.dof_SubGs[g];i++) {
+			h++
+			st_numscalar( sprintf("e(M%f)",h) , S.doflist_M[h] )
+			st_numscalar( sprintf("e(K%f)",h) , S.fes[g].levels )
+			if (stataversion()>=1200) {
+				st_global( sprintf("e(M%f_exact)",h) , strofreal(S.doflist_M_is_exact[h]) , "hidden" )
+				st_global( sprintf("e(M%f_nested)",h) , strofreal(S.doflist_M_is_nested[h]) , "hidden" )
+				st_global( sprintf("e(G%f)",h) , strofreal(g) , "hidden" ) // unused?
+			}
+			else {
+				st_global( sprintf("e(M%f_exact)",h) , strofreal(S.doflist_M_is_exact[h]) )
+				st_global( sprintf("e(M%f_nested)",h) , strofreal(S.doflist_M_is_nested[h]) )
+				st_global( sprintf("e(G%f)",h) , strofreal(g) ) // unused?
+			}
+		}
+	}
 }
 
 // -------------------------------------------------------------------------------------------------

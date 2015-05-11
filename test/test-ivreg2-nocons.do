@@ -23,7 +23,6 @@ noi cscript "reghdfe with ivreg2 should use nocons" adofile reghdfe
 
 	
 * [TEST] One core (what was the point of this?)
-set trace off
 	
 	areg price weight length, absorb(turn)
 	TrimMatrix 2
@@ -38,7 +37,6 @@ set trace off
 	storedresults drop areg
 
 * [TEST] IV
-set trace off
 
 	reghdfe price weight (length=disp), a(turn) ivsuite(ivreg2) keepsingletons
 	TrimMatrix 2

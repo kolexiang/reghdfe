@@ -1,4 +1,4 @@
-*! hdfe 3.0.339 09may2015
+*! hdfe 3.0.1 10may2015
 *! Sergio Correia (sergio.correia@duke.edu)
 
 *! version 1.1.0 10jul2014

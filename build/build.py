@@ -106,10 +106,11 @@ for fn in output_filenames:
     # Add other includes
     includes = re.findall('^\s*include "([^"]+)"', data, re.MULTILINE)
     for include in includes:
-        print("    parsing include <{}>".format(include))
+        print("    parsing include <{}>".format(include), end="")
         full_include = os.path.join(source_path, include)
         include_data = open(full_include, "rb").read()
         data = data.replace(u'include "{}"'.format(include), '\r\n' + include_data)
+        print(": {} lines".format(len(include_data.split('\n'))))
 
     # Remove cap drop
     capdrops = re.findall('\s^\s*cap[a-z]* pr[a-z]* drop [a-zA-Z0-9_]+\s*$', data, re.MULTILINE)
@@ -141,6 +142,7 @@ shutil.copy(os.path.join(source_path, u"reghdfe.sthlp"), os.path.join(server_pat
 shutil.copy(os.path.join(source_path, u"hdfe.sthlp"), os.path.join(server_path, u"hdfe.sthlp"))
 shutil.copy(os.path.join(source_path, u"stata.toc"), os.path.join(server_path, u"stata.toc"))
 
+shutil.copy(os.path.join(source_path, u"reghdfe_old.sthlp"), os.path.join(server_path, u"reghdfe_old.sthlp"))
 shutil.copy(os.path.join(source_path, u"reghdfe_old.ado"), os.path.join(server_path, u"reghdfe_old.ado"))
 shutil.copy(os.path.join(source_path, u"reghdfe_old_p.ado"), os.path.join(server_path, u"reghdfe_old_p.ado"))
 shutil.copy(os.path.join(source_path, u"reghdfe_old_estat.ado"), os.path.join(server_path, u"reghdfe_old_estat.ado"))

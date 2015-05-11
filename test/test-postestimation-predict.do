@@ -22,7 +22,7 @@ noi cscript "reghdfe postestimation: predict" adofile reghdfe
 		ereturn matrix trim_b = trim_b
 		ereturn matrix trim_V = trim_V
 	end
-	
+set trace off	
 * Create fake dataset
 	sysuse auto
 	*gen n = int(uniform()*10+3) // used for weights

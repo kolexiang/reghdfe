@@ -78,7 +78,7 @@ void function alphas2dta(`Problem' S) {
 	`Varlist' target
 	`String' varlabel
 	assert(S.will_save_fe==1)
-	if (S.verbose>1) printf("{txt}    - Storing fixed effects in the original dataset\n", S.groupvar)
+	if (S.verbose>1) printf("{txt}    - Storing fixed effects in the original dataset\n")
 	for (g=1; g<=S.G; g++) {
 		target = S.fes[g].target
 		if (length(target)>0) {

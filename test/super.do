@@ -27,9 +27,6 @@
 	run test-cluster
 	run test-ivreg2
 
-	* TODO NOW:
-	run test-stages
-	run test-over
 
 	run test-avar
 
@@ -59,6 +56,9 @@
 	run test-attach
 
 
+	* TODO NOW:
+	run test-stages
+	run test-over
 	* TODO LATER:
 	// run test-hdfe // just tests that the syntax works, not for correctness
 

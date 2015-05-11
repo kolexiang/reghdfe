@@ -48,5 +48,15 @@ struct MapProblem {
 	`Series'		uid
 	`Series'		resid
 	`Varname'		residname
+
+	// Temporary storage for DoFs
+	`Integer'		dof_M
+	`Integer'		dof_M_due_to_nested
+	`Integer'		dof_KminusM
+	`Integer'		dof_N_hdfe_extended
+	`Vector'		doflist_M
+	`Vector'		doflist_M_is_exact
+	`Vector'		doflist_M_is_nested
+	`Vector'		dof_SubGs
 }
 end

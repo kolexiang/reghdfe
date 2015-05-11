@@ -8,6 +8,7 @@ void function map_solve(`Problem' S, `Varlist' vars,
 	`FunctionPointer' transform, accelerate
 	real rowvector stdevs
 	`Varlist'	target
+	`Varlist'	chars
 
 	if (S.verbose>0) printf("{txt}{bf:mata: map_solve()}\n")
 	assert_msg(S.N!=., "map_solve() needs to be run after map_precompute()")
@@ -19,6 +20,13 @@ void function map_solve(`Problem' S, `Varlist' vars,
 	vars = tokens(vars)
 	y = st_data(., vars)
 	Q = cols(y)
+
+	// Store chars var[name] that contain the original varname (e.g. L.var)
+	chars = J(1, Q, "")
+	for (i=1;i<=Q;i++) {
+		chars[i] = st_global(sprintf("%s[name]", vars[i]))
+	}
+
 	st_dropvar(vars) // We need the new ones on double precision
 
 	if (args()<3 | newvars=="") newvars = vars
@@ -109,8 +117,14 @@ void function map_solve(`Problem' S, `Varlist' vars,
 	}
 
 	if (S.verbose>1) printf("{txt} - Saving transformed variables\n")
+	
 	// BUGBUG: This will use 2x memory for a while; partition the copy+drop based on S.groupsize?
 	st_store(., st_addvar("double", newvars), y :* stdevs)
+	y = J(0,0,.) // clear space
+
+	for (i=1;i<=Q;i++) {
+		st_global(sprintf("%s[name]", newvars[i]), chars[i])
+	}
 
 	// Store FEs
 	if (save_fe) {

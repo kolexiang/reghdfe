@@ -7,7 +7,6 @@ program define Parse
 
 * Remove extra spacing from cmdline (just for aesthetics)
 	mata: st_local("cmdline", stritrim(`"reghdfe `0'"') )
-	ereturn clear // Clear previous results and drops e(sample)
 
 * Parse the broad syntax (also see map_init(), ParseAbsvars.ado, ParseVCE.ado, etc.)
 	syntax anything(id="varlist" name=0 equalok) [if] [in] [fw aw pw/] , ///
@@ -15,19 +14,19 @@ program define Parse
 		Absorb(string) ///
 		[ ///
 		VCE(string) ///
+		Verbose(string) ///
 	/// Seldom Used ///
 		DOFadjustments(string) ///
 		GROUPVAR(name) /// Variable that will contain the first connected group between FEs
 	/// Optimization /// Defaults are handled within Mata		
+		FAST /// Fast precludes i) saving FE, ii) running predict, iii) saving groupvar
 		GROUPsize(string) /// Process variables in batches of #
 		TRAnsform(string) ///
 		ACCELeration(string) ///
-		Verbose(string) ///
 		TOLerance(string) ///
 		MAXITerations(string) ///
 		KEEPSINgletons /// (UNDOCUMENTED) Will keep singletons
 		CHECK /// TODO: Implement
-		FAST /// TODO: Implement
 	/// Regression ///
 		ESTimator(string) /// GMM2s CUE LIML
 		IVsuite(string) ///
@@ -38,9 +37,12 @@ program define Parse
 		SMALL Hascons TSSCONS /// ignored options
 		SUBOPTions(string) /// Options to be passed to the estimation command (e.g . to regress)
 	/// Multiple regressions in one go ///
-		OVER(varname numeric) CLEAR ///
-		NESTED /// TODO: Implement
 		STAGEs(string) ///
+		SAVEcache ///
+		USEcache ///
+		BY(varname numeric) ///
+		LEVEL(string) /// level of by (should be an integer actually)
+		NESTED /// TODO: Implement
 	/// Miscellanea ///
 		NOTES(string) /// NOTES(key=value ..)
 		] [*] // For display options ; and SUmmarize(stats)
@@ -114,14 +116,9 @@ program define Parse
 	}
 	local allkeys `allkeys' `optlist'
 
-	local fast = cond("`fast'"!="", 1, 0) // 1=Yes
-	* Fast precludes i) saving FE, ii) running predict, iii) saving groupvar
-	if (`fast' & ("`groupvar'"!="" | `will_save_fe'==1)) {
-		di as error "(warning: option -fast- not allowed when saving FEs or mobility groups; disabled)"
-		local fast 0
-	}
-
-	local allkeys `allkeys' fast
+	* Return back default value of -verbose-
+	mata: verbose2local(HDFE_S, "verbose")
+	local allkeys `allkeys' verbose
 
 * Parse VCE options
 	mata: st_local("hascomma", strofreal(strpos("`vce'", ","))) // is there a commma already in `vce'?
@@ -153,13 +150,19 @@ program define Parse
 	if ("`stats'"=="" & "`quietly'"!="") local stats `default_stats'
 	local allkeys `allkeys' stats summarize_quietly
 
-* Parse over() option
-	local clear = "`clear'"!=""
- 	if ("`over'"!="") {
-		unab over : `over', max(1)
-		Assert (`clear'), msg("over() requires the -clear- option")
+* Parse speedups
+	local fast = "`fast'"!=""
+	local savecache = "`savecache'"!=""
+	local usecache = "`usecache'"!=""
+	if (`fast' & ("`groupvar'"!="" | `will_save_fe'==1)) {
+		di as error "(warning: option -fast- not allowed when saving FEs or mobility groups; disabled)"
+		local fast 0
 	}
-	local allkeys `allkeys' over clear
+ 	if ("`by'"!="") {
+		unab by : `by', max(1)
+	}
+	local allkeys `allkeys' fast savecache usecache by level
+
 
 * Nested
 	local nested = cond("`nested'"!="", 1, 0) // 1=Yes
@@ -202,5 +205,6 @@ program define Parse
 		if (`"``key''"'!="") Debug, level(3) msg("  `key' = " as result `"``key''"')
 		c_local `key' `"``key''"' // Inject values into caller (reghdfe.ado)
 	}
+
 end
 

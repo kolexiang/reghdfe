@@ -1,7 +1,7 @@
 cap pr drop Wrapper_regress
 program define Wrapper_regress, eclass
 	syntax , depvar(varname) [indepvars(varlist) avgevars(varlist)] ///
-		vceoption(string asis) ///
+		vceoption(string asis)  ///
 		kk(integer) ///
 		[weightexp(string)] ///
 		[SUBOPTions(string)] [*] // [*] are ignored!

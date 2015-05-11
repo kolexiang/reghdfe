@@ -9,13 +9,7 @@ cap pr drop Replay
 	Assert "`subcmd'"!="" , msg("e(subcmd) is empty")
 	if (`c(version)'>=12) local hidden hidden
 
-	* Add pretty names for AvgE variables
-	tempname b
-	matrix `b' = e(b)
-	local backup_colnames : colnames `b'
-	matrix colnames `b' = `e(prettynames)'
 	local savefirst = e(savefirst)
-	local suboptions = e(suboptions)
 
 	local diopts = "`e(diopts)'"
 	if ("`options'"!="") { // Override
@@ -47,8 +41,9 @@ cap pr drop Replay
 			di as input _n "{title:Second stage}"
 		}
 
+		// BUGBUG: Update this part
 		estimates store `hold'
-		ereturn repost b=`b', rename
+		// ereturn repost b=`b', rename
 		ereturn local cmd = "`subcmd'"
 		`subcmd' , `diopts'
 		ereturn clear // Need this because -estimates restore- behaves oddly
@@ -86,7 +81,4 @@ cap pr drop Replay
 	if (`width'<12) local width 12
 	ereturn `hidden' scalar width = `width'
 	reghdfe_footnote
-	* Revert AvgE else -predict- and other commands will choke
-
-
 end
