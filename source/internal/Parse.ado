@@ -49,6 +49,15 @@ program define Parse
 
 	local allkeys cmdline if in
 
+* Need to do this early
+	local fast = "`fast'"!=""
+	local savecache = "`savecache'"!=""
+	local usecache = "`usecache'"!=""
+	if (!`usecache') {
+		local is_cache : char _dta[reghdfe_cache]
+		Assert "`is_cache'"!="1", msg("reghdfe error: data transformed with -savecache- requires -usecache-")
+	}
+
 * Parse varlist: depvar indepvars (endogvars = iv_vars)
 	ParseIV `0', estimator(`estimator') ivsuite(`ivsuite') `savefirst' `first' `showraw' `vceunadjusted' `small'
 	local keys subcmd model ivsuite estimator depvar indepvars endogvars instruments fe_format ///
@@ -82,6 +91,7 @@ program define Parse
 	local allkeys `allkeys' weightvar weighttype weightexp
 
 * Parse Absvars and optimization options
+if (!`usecache') {
 	ParseAbsvars `absorb' // Stores results in r()
 		local absorb_keepvars `r(all_ivars)' `r(all_cvars)'
 		local N_hdfe `r(G)'
@@ -91,10 +101,18 @@ program define Parse
 		local original_absvars = "`r(original_absvars)'"
 		local extended_absvars = "`r(extended_absvars)'"
 		local equation_d = "`r(equation_d)'"
+}
+else {
+	local will_save_fe 0
+	local original_absvars : char _dta[original_absvars]
+	local extended_absvars : char _dta[extended_absvars]
+	local equation_d
+	local N_hdfe : char _dta[N_hdfe]
+}
 	local allkeys `allkeys' absorb_keepvars N_hdfe will_save_fe original_absvars extended_absvars equation_d
 
 	* Tell Mata what weightvar we have
-	if ("`weightvar'"!="") mata: map_init_weights(HDFE_S, "`weightvar'", "`weighttype'")
+	if ("`weightvar'"!="" & !`usecache') mata: map_init_weights(HDFE_S, "`weightvar'", "`weighttype'")
 
 	* Time/panel variables (need to give them to Mata)
 	local panelvar `_dta[_TSpanel]'
@@ -104,7 +122,7 @@ program define Parse
 	* String options
 	local optlist transform acceleration panelvar timevar
 	foreach opt of local optlist {
-		if ("``opt''"!="") mata: map_init_`opt'(HDFE_S, "``opt''")
+		if ("``opt''"!="" & !`usecache') mata: map_init_`opt'(HDFE_S, "``opt''")
 	}
 	local allkeys `allkeys' `optlist'
 
@@ -112,7 +130,7 @@ program define Parse
 	local keepsingletons = ("`keepsingletons'"!="")
 	local optlist groupsize verbose tolerance maxiterations keepsingletons
 	foreach opt of local optlist {
-		if ("``opt''"!="") mata: map_init_`opt'(HDFE_S, ``opt'')
+		if ( "``opt''"!="" & (!`usecache' | "`opt'"=="verbose") ) mata: map_init_`opt'(HDFE_S, ``opt'')
 	}
 	local allkeys `allkeys' `optlist'
 
@@ -131,8 +149,8 @@ program define Parse
 	local allkeys `allkeys' `keys'
 	
 	* Update Mata
-	if ("`clustervars'"!="") mata: map_init_clustervars(HDFE_S, "`clustervars'")
-	if ("`vceextra'"!="") mata: map_init_vce_is_hac(HDFE_S, 1)
+	if ("`clustervars'"!="" & !`usecache') mata: map_init_clustervars(HDFE_S, "`clustervars'")
+	if ("`vceextra'"!="" & !`usecache') mata: map_init_vce_is_hac(HDFE_S, 1)
 
 * DoF Adjustments
 	if ("`dofadjustments'"=="") local dofadjustments all
@@ -151,9 +169,6 @@ program define Parse
 	local allkeys `allkeys' stats summarize_quietly
 
 * Parse speedups
-	local fast = "`fast'"!=""
-	local savecache = "`savecache'"!=""
-	local usecache = "`usecache'"!=""
 	if (`fast' & ("`groupvar'"!="" | `will_save_fe'==1)) {
 		di as error "(warning: option -fast- not allowed when saving FEs or mobility groups; disabled)"
 		local fast 0
@@ -166,17 +181,22 @@ program define Parse
 * Sanity checks on speedups
 	Assert `usecache' + `savecache' < 2, msg("savecache and usecache are mutually exclusive")
 	if (`savecache') {
+		* Savecache "requires" a previous preserve, so we can directly modify the dataset
 		Assert "`endogvars'`instruments'"=="", msg("savecache option requires a normal varlist, not an iv varlist")
 		char _dta[reghdfe_cache] 1
-		char _dta[cache_obs] `c(N)'
-		char _dta[cache_absvars] `original_absvars'
+		char _dta[absorb] `absorb'
+		char _dta[N_hdfe] `N_hdfe'
+		char _dta[original_absvars] `original_absvars'
+		char _dta[extended_absvars] `extended_absvars'
 	}
 	else if (`usecache') {
 		local is_cache : char _dta[reghdfe_cache]
+		local cache_obs : char _dta[cache_obs]
+		local cache_absorb : char _dta[absorb]
 		Assert "`is_cache'"=="1" , msg("usecache requires a previous savecache operation")
-		local cache_obs : char _dta[obs]
-		Assert `cache_obs'==c(N), msg("dataset cannot change after savecache")
-		Assert "`cache_absvars'"=="`original_absvars'", msg("cache dataset has different absvars")
+		Assert `cache_obs'==`c(N)', msg("dataset cannot change after savecache")
+		Assert "`cache_absorb'"=="`absorb'", msg("cache dataset has different absorb()")
+		Assert "`if'`in'"=="", msg("cannot use if/in with usecache; data has already been transformed")
 	}
 
 * Nested

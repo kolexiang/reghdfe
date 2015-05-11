@@ -1,4 +1,4 @@
-*! hdfe 3.0.144 11may2015
+*! hdfe 3.0.223 11may2015
 *! Sergio Correia (sergio.correia@duke.edu)
 
 
@@ -1766,6 +1766,17 @@ program define reghdfe
 		exit
 	}
 
+* Intercept cleanup of cache (must be before replay)
+	cap syntax, CLEANupcache
+	if !c(rc) {
+		mata: mata drop HDFE_S // overwrites c(rc)
+		mata: mata drop varlist_cache
+		mata: mata drop tss_cache
+		global updated_clustervars
+		cap matrix drop reghdfe_statsmatrix
+		exit
+	}
+
 * Intercept replays
 	if replay() {
 		if (`"`e(cmd)'"'!="reghdfe") error 301
@@ -1780,28 +1791,20 @@ program define reghdfe
 		if (c(rc)) {
 			local rc = c(rc)
 			cap mata: mata drop HDFE_S // overwrites c(rc)
+			cap mata: mata drop varlist_cache
+			cap mata: mata drop tss_cache
 			global updated_clustervars
+			cap matrix drop reghdfe_statsmatrix
 			exit `rc'
 		}
+		exit
 	}
 
 * Intercept usecache
 	cap syntax anything(everything) [fw aw pw/], [*] USEcache
 	if !c(rc) {
-		cap noi InnerUseCache `0'
-		if (c(rc)) {
-			local rc = c(rc)
-			cap mata: mata drop HDFE_S // overwrites c(rc)
-			global updated_clustervars
-			exit `rc'
-		}
-	}
-
-* Intercept cleanup of cache
-	cap syntax anything(everything) [fw aw pw/], [*] CLEANupcache
-	if !c(rc) {
-		cap mata: mata drop HDFE_S // overwrites c(rc)
-		global updated_clustervars
+		InnerUseCache `0'
+		exit
 	}
 
 * Finally, call Inner
@@ -1875,7 +1878,7 @@ end
 // -------------------------------------------------------------
 
 program define Version, eclass
-    local version "3.0.144 11may2015"
+    local version "3.0.223 11may2015"
     ereturn clear
     di as text "`version'"
     ereturn local version "`version'"
@@ -2187,6 +2190,15 @@ program define Parse
 
 	local allkeys cmdline if in
 
+* Need to do this early
+	local fast = "`fast'"!=""
+	local savecache = "`savecache'"!=""
+	local usecache = "`usecache'"!=""
+	if (!`usecache') {
+		local is_cache : char _dta[reghdfe_cache]
+		Assert "`is_cache'"!="1", msg("reghdfe error: data transformed with -savecache- requires -usecache-")
+	}
+
 * Parse varlist: depvar indepvars (endogvars = iv_vars)
 	ParseIV `0', estimator(`estimator') ivsuite(`ivsuite') `savefirst' `first' `showraw' `vceunadjusted' `small'
 	local keys subcmd model ivsuite estimator depvar indepvars endogvars instruments fe_format ///
@@ -2220,6 +2232,7 @@ program define Parse
 	local allkeys `allkeys' weightvar weighttype weightexp
 
 * Parse Absvars and optimization options
+if (!`usecache') {
 	ParseAbsvars `absorb' // Stores results in r()
 		local absorb_keepvars `r(all_ivars)' `r(all_cvars)'
 		local N_hdfe `r(G)'
@@ -2229,10 +2242,18 @@ program define Parse
 		local original_absvars = "`r(original_absvars)'"
 		local extended_absvars = "`r(extended_absvars)'"
 		local equation_d = "`r(equation_d)'"
+}
+else {
+	local will_save_fe 0
+	local original_absvars : char _dta[original_absvars]
+	local extended_absvars : char _dta[extended_absvars]
+	local equation_d
+	local N_hdfe : char _dta[N_hdfe]
+}
 	local allkeys `allkeys' absorb_keepvars N_hdfe will_save_fe original_absvars extended_absvars equation_d
 
 	* Tell Mata what weightvar we have
-	if ("`weightvar'"!="") mata: map_init_weights(HDFE_S, "`weightvar'", "`weighttype'")
+	if ("`weightvar'"!="" & !`usecache') mata: map_init_weights(HDFE_S, "`weightvar'", "`weighttype'")
 
 	* Time/panel variables (need to give them to Mata)
 	local panelvar `_dta[_TSpanel]'
@@ -2242,7 +2263,7 @@ program define Parse
 	* String options
 	local optlist transform acceleration panelvar timevar
 	foreach opt of local optlist {
-		if ("``opt''"!="") mata: map_init_`opt'(HDFE_S, "``opt''")
+		if ("``opt''"!="" & !`usecache') mata: map_init_`opt'(HDFE_S, "``opt''")
 	}
 	local allkeys `allkeys' `optlist'
 
@@ -2250,7 +2271,7 @@ program define Parse
 	local keepsingletons = ("`keepsingletons'"!="")
 	local optlist groupsize verbose tolerance maxiterations keepsingletons
 	foreach opt of local optlist {
-		if ("``opt''"!="") mata: map_init_`opt'(HDFE_S, ``opt'')
+		if ( "``opt''"!="" & (!`usecache' | "`opt'"=="verbose") ) mata: map_init_`opt'(HDFE_S, ``opt'')
 	}
 	local allkeys `allkeys' `optlist'
 
@@ -2269,8 +2290,8 @@ program define Parse
 	local allkeys `allkeys' `keys'
 	
 	* Update Mata
-	if ("`clustervars'"!="") mata: map_init_clustervars(HDFE_S, "`clustervars'")
-	if ("`vceextra'"!="") mata: map_init_vce_is_hac(HDFE_S, 1)
+	if ("`clustervars'"!="" & !`usecache') mata: map_init_clustervars(HDFE_S, "`clustervars'")
+	if ("`vceextra'"!="" & !`usecache') mata: map_init_vce_is_hac(HDFE_S, 1)
 
 * DoF Adjustments
 	if ("`dofadjustments'"=="") local dofadjustments all
@@ -2289,9 +2310,6 @@ program define Parse
 	local allkeys `allkeys' stats summarize_quietly
 
 * Parse speedups
-	local fast = "`fast'"!=""
-	local savecache = "`savecache'"!=""
-	local usecache = "`usecache'"!=""
 	if (`fast' & ("`groupvar'"!="" | `will_save_fe'==1)) {
 		di as error "(warning: option -fast- not allowed when saving FEs or mobility groups; disabled)"
 		local fast 0
@@ -2304,17 +2322,22 @@ program define Parse
 * Sanity checks on speedups
 	Assert `usecache' + `savecache' < 2, msg("savecache and usecache are mutually exclusive")
 	if (`savecache') {
+		* Savecache "requires" a previous preserve, so we can directly modify the dataset
 		Assert "`endogvars'`instruments'"=="", msg("savecache option requires a normal varlist, not an iv varlist")
 		char _dta[reghdfe_cache] 1
-		char _dta[cache_obs] `c(N)'
-		char _dta[cache_absvars] `original_absvars'
+		char _dta[absorb] `absorb'
+		char _dta[N_hdfe] `N_hdfe'
+		char _dta[original_absvars] `original_absvars'
+		char _dta[extended_absvars] `extended_absvars'
 	}
 	else if (`usecache') {
 		local is_cache : char _dta[reghdfe_cache]
+		local cache_obs : char _dta[cache_obs]
+		local cache_absorb : char _dta[absorb]
 		Assert "`is_cache'"=="1" , msg("usecache requires a previous savecache operation")
-		local cache_obs : char _dta[obs]
-		Assert `cache_obs'==c(N), msg("dataset cannot change after savecache")
-		Assert "`cache_absvars'"=="`original_absvars'", msg("cache dataset has different absvars")
+		Assert `cache_obs'==`c(N)', msg("dataset cannot change after savecache")
+		Assert "`cache_absorb'"=="`absorb'", msg("cache dataset has different absorb()")
+		Assert "`if'`in'"=="", msg("cannot use if/in with usecache; data has already been transformed")
 	}
 
 * Nested
@@ -2364,7 +2387,7 @@ end
 program define ParseIV, sclass
 	syntax anything(id="varlist" name=0 equalok), [ ///
 		estimator(string) ivsuite(string) ///
-		savefirst first showraw vceunadjusted small ]
+		savefirst first showraw vceunadjusted small]
 
 	* Parses varlist: depvar indepvars [(endogvars = instruments)]
 		* depvar: dependent variable
@@ -2721,7 +2744,7 @@ end
 program define Compact, sclass
 syntax, basevars(string) verbose(integer) [depvar(string) indepvars(string) endogvars(string) instruments(string)] ///
 	[uid(string) timevar(string) panelvar(string) weightvar(string) absorb_keepvars(string) clustervars(string)] ///
-	[if(string) in(string) by(string) vceextra(string)]
+	[if(string) in(string) by(string) vceextra(string)] [savecache(integer 0)]
 
 * Drop unused variables
 	local exp "= `weightvar'"
@@ -2739,16 +2762,30 @@ syntax, basevars(string) verbose(integer) [depvar(string) indepvars(string) endo
 	foreach set of local sets {
 		local varlist ``set''
 		if ("`varlist'"=="") continue
-		local original_`set' `varlist'
+		// local original_`set' `varlist'
 		* the -if- prevents creating dummies for categories that have been excluded
-		ExpandFactorVariables `varlist' if `touse', setname(`set') verbose(`verbose')
+		ExpandFactorVariables `varlist' if `touse', setname(`set') verbose(`verbose') savecache(`savecache')
 		local `set' "`r(varlist)'"
 		local expandedvars `expandedvars' ``set''
 	}
 
+* Variables needed for savecache
+	if (`savecache') {
+		local cachevars `timevar' `panelvar'
+		foreach basevar of local basevars {
+			local in_expanded : list basevar in expandedvars
+			if (!`in_expanded') {
+				local cachevars `cachevars' `basevar'
+				char `basevar'[forbidden] 1
+			}
+		}
+		c_local cachevars `cachevars'
+		if ("`cachevars'"!="") Debug, level(0) msg("(cachevars: {res}`cachevars'{txt})")
+	}
+
 * Drop unused basevars and tsset vars (usually no longer needed)
 	if ("`vceextra'"!="") local tsvars `panelvar' `timevar' // We need to keep them only with autoco-robust VCE
-	keep `uid' `touse' `expandedvars' `weightvar' `absorb_keepvars' `cluster_keepvars' `tsvars' `by' 
+	keep `uid' `touse' `expandedvars' `weightvar' `absorb_keepvars' `cluster_keepvars' `tsvars' `by' `cachevars'
 
 * Drop excluded observations and observations with missing values
 	markout `touse' `expandedvars' `weightvar' `absorb_keepvars' `cluster_keepvars'
@@ -2774,12 +2811,15 @@ end
 * 3) Drop i) omitted variables, and ii) base variables (if not part of a #c.var interaction)
 
 program define ExpandFactorVariables, rclass
-syntax varlist(min=1 numeric fv ts) [if] [,setname(string)] [CACHE] verbose(integer)
+syntax varlist(min=1 numeric fv ts) [if] [,setname(string)] [SAVECACHE(integer 0)] verbose(integer)
 	
 	* If saving the data for later regressions -savecache(..)- we will need to match each expansion to its newvars
-	* This mata array is used for that
+	* The mata array is used for that
 	* Note: This explains why we need to wrap -fvrevar- in a loop
-	if ("`cache'"!="") mata: varlist_cache = asarray_create()
+	if (`savecache') {
+		mata: varlist_cache = asarray_create()
+		mata: asarray_notfound(varlist_cache, "")
+	}
 
 	local expanded_msg `"" - variable expansion for `setname': {res}`varlist'{txt} ->""'
 	while (1) {
@@ -2790,15 +2830,18 @@ syntax varlist(min=1 numeric fv ts) [if] [,setname(string)] [CACHE] verbose(inte
 		local contents
 		foreach var of varlist `r(varlist)' {
 			LabelRenameVariable `var' // Tempvars not renamed will be dropped automatically
-			if !r(is_dropped) local contents `contents' `r(varname)'
+			if !r(is_dropped) {
+				local contents `contents' `r(varname)'
+				// if (`savecache') di as error `"<mata: asarray(varlist_cache, "`factorvar'", "`r(varname)'")>"'
+				if (`savecache') mata: asarray(varlist_cache, "`factorvar'", "`r(varname)'")
+			}
 			* Yellow=Already existed, White=Created, Red=NotCreated (omitted or base)
 			local color = cond(r(is_dropped), "error", cond(r(is_newvar), "input", "result"))
 			if (`verbose'>3) {
 				local expanded_msg `"`expanded_msg' as `color' " `r(name)'" as text " (`r(varname)')""'
 			}
 		}
-		Assert "`contents'"!="", msg("error: variable -`fvvar'- in varlist -`varlist'- in category -`setname'- is  empty after factor/time expansion")
-		if ("`cache'"!="") mata: asarray(varlist_cache, "`fvvar'", "`contents'")
+		Assert "`contents'"!="", msg("error: variable -`factorvar'- in varlist -`varlist'- in category -`setname'- is  empty after factor/time expansion")
 		local newvarlist `newvarlist' `contents'
 	}
 
@@ -4119,33 +4162,39 @@ program define InnerSaveCache, eclass
 	assert `savecache'
 	Assert !`will_save_fe', msg("savecache disallows saving FEs")
 
-* CREATE UID - allows attaching e(sample) and the FE estimates into the restored dataset
-	if (`preserve' & !`fast') {
-		tempvar uid
-		GenUID `uid'
-	}
+* PROBLEM:
+	* I can translate L(1/2).x into __L__x __L2__x
+	* But how can I translate i.x if I don't have the original anymore?
+
+* SOLUTION
+	* The cache option of ExpandFactorVariables (called from Compact.ado)
 
 * COMPACT - Expand time and factor variables, and drop unused variables and obs.
-	local original_depvar "`depvar'"
-	Compact, basevars(`basevars') depvar(`depvar') indepvars(`indepvars') endogvars(`endogvars') instruments(`instruments') uid(`uid') timevar(`timevar') panelvar(`panelvar') weightvar(`weightvar') absorb_keepvars(`absorb_keepvars') clustervars(`clustervars') if(`if') in(`in') by(`by') verbose(`verbose') vceextra(`vceextra')
-	// Injects locals: depvar indepvars endogvars instruments expandedvars
+	Compact, basevars(`basevars') depvar(`depvar' `indepvars') uid(`uid') timevar(`timevar') panelvar(`panelvar') weightvar(`weightvar') absorb_keepvars(`absorb_keepvars') clustervars(`clustervars') if(`if') in(`in') by(`by') verbose(`verbose') vceextra(`vceextra') savecache(1)
+	// Injects locals: depvar indepvars endogvars instruments expandedvars cachevars
 
 * PRECOMPUTE MATA OBJECTS (means, counts, etc.)
-	mata: map_init_keepvars(HDFE_S, "`expandedvars' `uid'") 	// Non-essential vars will be deleted (e.g. interactions of a clustervar)
+	mata: map_init_keepvars(HDFE_S, "`expandedvars' `uid' `cachevars'") 	// Non-essential vars will be deleted (e.g. interactions of a clustervar)
 	mata: map_precompute(HDFE_S)
 	global updated_clustervars = "`r(updated_clustervars)'"
 	
-* PREPARE - Compute untransformed tss, R2 of eqn w/out FEs
-	BUGBUG TENGO QUE GUARDAR PA TODOS?!
-	Prepare, weightexp(`weightexp') depvar(`depvar') stages(`stages') model(`model') expandedvars(`expandedvars') vcetype(`vcetype') endogvars(`endogvars')
-	* Injects tss, tss_`endogvar' (with stages), and r2c
+* PREPARE - Compute untransformed tss *OF ALL THE VARIABLES*
+	mata: tss_cache = asarray_create()
+	mata: asarray_notfound(tss_cache, .)
+	local tmpweightexp = subinstr("`weightexp'", "[pweight=", "[aweight=", 1)
+	foreach var of local expandedvars {
+		qui su `var' `tmpweightexp' // BUGBUG: Is this correct?!
+		local tss = r(Var)*(r(N)-1)
+		mata: asarray(tss_cache, "`var'", `tss')
+	}
+	*NOTE: r2c is too slow and thus won't be saved
+	*ALTERNATIVE: Allow a varlist of the form (depvars) (indepvars) and only compute for those
 
 * COMPUTE e(stats) - Summary statistics for the all the regression variables
 	if ("`stats'"!="") {
 		local tabstat_weight : subinstr local weightexp "[pweight" "[aweight"
 		qui tabstat `expandedvars' `tabstat_weight' , stat(`stats') col(stat) save
-		tempname statsmatrix
-		matrix `statsmatrix' = r(StatTotal)
+		matrix reghdfe_statsmatrix = r(StatTotal)
 	}
 
 * MAP_SOLVE() - WITHIN TRANFORMATION (note: overwrites variables)
@@ -4153,6 +4202,180 @@ program define InnerSaveCache, eclass
 	local NUM_VARS : word count `r(varlist)'
 	Debug, msg("(computing residuals for `NUM_VARS' variables)")
 	mata: map_solve(HDFE_S, "`expandedvars'")
+
+* This was in -parse- but we are dropping observations through the code
+	char _dta[cache_obs] `c(N)'
+end
+
+program define InnerUseCache, eclass
+
+* INITIAL CLEANUP
+	ereturn clear // Clear previous results and drops e(sample)
+
+* PARSE - inject opts with c_local, create Mata structure HDFE_S (use verbose>2 for details)
+	Parse `0'
+	assert `usecache'
+
+* Match "L.price" --> __L__price
+* Expand factor and time-series variables
+* (based on part of Compact.ado)
+	local expandedvars
+	local sets depvar indepvars endogvars instruments // depvar MUST be first
+	Debug, level(4) newline
+	Debug, level(4) msg("{title:Expanding factor and time-series variables:}")
+	foreach set of local sets {
+		local varlist ``set''
+		local `set' // empty
+		if ("`varlist'"=="") continue
+		fvunab factors : `varlist', name("error parsing `set'")
+		foreach factor of local factors {
+			mata: st_local("var", asarray(varlist_cache, "`factor'"))
+			Assert "`var'"!="", msg("couldn't find the match of {res}`factor'{error} in the cache (details: set=`set'; factors=`factors')")
+			local `set' ``set'' `var'
+		}
+		local expandedvars `expandedvars' ``set''
+	}
+
+* Replace vceoption with the correct cluster names (e.g. if it's a FE or a new variable)
+	if (`num_clusters'>0) {
+		assert "$updated_clustervars"!=""
+		local vceoption : subinstr local vceoption "<CLUSTERVARS>" "$updated_clustervars"
+	}
+
+* PREPARE - Compute untransformed tss, R2 of eqn w/out FEs
+	mata: st_local("tss", strofreal(asarray(tss_cache, "`depvar'")))
+	Assert `tss'<., msg("tss of depvar `depvar' not found in cache")
+	foreach var of local endogvars {
+		mata: st_local("tss_`var'", strofreal(asarray(tss_cache, "`var'")))
+	}
+	local r2c = . // BUGBUG!!!
+
+* STAGES SETUP - Deal with different stages
+	assert "`stages'"!=""
+	if ("`stages'"!="none") {
+		Debug, level(1) msg(_n " {title:Stages to run}: " as result "`stages'" _n)
+		* Need to backup some locals
+		local backuplist groupvar fast will_save_fe depvar indepvars endogvars instruments original_depvar tss
+		foreach loc of local backuplist {
+			local backup_`loc' ``loc''
+		}
+
+		local num_stages : word count `stages'
+		local last_stage : word `num_stages' of `stages'
+		assert "`last_stage'"=="iv"
+	}
+
+* STAGES LOOPS
+foreach stage of local stages {
+Assert inlist("`stage'", "none", "iv", "first", "ols", "reduced", "acid")
+local lhs_endogvars = cond("`stage'"=="first", "`backup_endogvars'", "<none>")
+local i_endogvar = cond("`stage'"=="first", "0", "")
+foreach lhs_endogvar of local lhs_endogvars {
+
+	if ("`stage'"!="none") {
+		* Start with backup values
+		foreach loc of local backuplist {
+			local `loc' `backup_`loc''
+		}
+
+		if ("`stage'"=="ols") {
+			local indepvars `indepvars' `endogvars'
+		}
+		else if ("`stage'"=="reduced") {
+			local indepvars `indepvars' `instruments'
+		}
+		else if ("`stage'"=="acid") {
+			local indepvars `indepvars' `endogvars' `instruments'
+		}
+		else if ("`stage'"=="first") {
+			local ++ i_endogvar
+			local tss = `tss_`lhs_endogvar''
+			assert `tss'<.
+			local depvar `lhs_endogvar'
+			local indepvars `indepvars' `instruments'
+			local original_depvar : char `depvar'[name]
+			if ("`original_depvar'"=="") local original_depvar `depvar' 
+		}
+
+		if ("`stage'"!="iv") {
+			local fast 1
+			local will_save_fe 0
+			local vcesuite avar
+			local endogvars
+			local instruments
+			local groupvar
+		}
+	}
+
+* COMPUTE DOF
+* NOTE: could move this to before backup untransformed variables for the stages=none case!!!
+	mata: map_estimate_dof(HDFE_S, "`dofadjustments'", "`groupvar'") // requires the IDs
+	assert e(df_a)<. // estimate_dof() only sets e(df_a); ereturn_dof() is for setting everything aferwards
+	local kk = e(df_a) // we need this for the regression step
+
+* REGRESS - Call appropiate wrapper (regress, avar, mwc for ols; ivreg2, ivregress for iv)
+	ereturn clear
+	if ("`stage'"=="none") Debug, level(2) msg("(running regresion: `model'.`ivsuite')")
+	local wrapper "Wrapper_`subcmd'" // regress ivreg2 ivregress
+	if ("`subcmd'"=="regress" & "`vcesuite'"=="avar") local wrapper "Wrapper_avar"
+	if ("`subcmd'"=="regress" & "`vcesuite'"=="mwc") local wrapper "Wrapper_mwc"
+	if (!inlist("`stage'","none", "iv")) local wrapper "Wrapper_avar" // Compatible with ivreg2
+	Debug, level(3) msg(_n "call to wrapper:" _n as result "`wrapper', `options'")
+	local opt_list
+	local opts ///
+		depvar indepvars endogvars instruments ///
+		vceoption vcetype vcesuite ///
+		kk suboptions showraw vceunadjusted first weightexp ///
+		estimator twicerobust // Whether to run or not two-step gmm
+	foreach opt of local opts {
+		local opt_list `opt_list' `opt'(``opt'')
+	}
+	`wrapper', `opt_list'
+
+* FIX VARNAMES - Replace tempnames in the coefs table (run AFTER regress and BEFORE restore)
+	* (e.g. __00001 -> L.somevar)
+	tempname b
+	matrix `b' = e(b)
+	local backup_colnames : colnames `b'
+	FixVarnames `backup_colnames'
+	local newnames "`r(newnames)'"
+	matrix colnames `b' = `newnames'
+	ereturn repost b=`b', rename
+	ereturn local depvar = "`original_depvar'" // Run after SaveFE
+
+* POST ERETURN - Add e(...) (besides e(sample) and those added by the wrappers)	
+	local opt_list
+	local opts dofadjustments subpredict model stage stages subcmd cmdline vceoption equation_d original_absvars extended_absvars vcetype vcesuite tss r2c savefirst diopts weightvar gmm2s cue liml dkraay by level num_clusters clustervars timevar
+	foreach opt of local opts {
+		local opt_list `opt_list' `opt'(``opt'')
+	}
+	Post, `opt_list'
+
+* REPLAY - Show the regression table	
+	if ("`stage'"!="none") Debug, level(0) msg(_n "{title:Stage: `stage'}" _n)
+	if ("`lhs_endogvar'"!="<none>") Debug, level(0) msg("{title:Endogvar: `original_depvar'}")
+	Replay
+
+* STAGES - END
+	if (!inlist("`stage'","none", "iv")) {
+		local estimate_name reghdfe_`stage'`i_endogvar'
+		local stored_estimates `stored_estimates' `estimate_name'
+		local cmd estimates store `estimate_name', nocopy
+		Debug, level(2) msg(" - Storing estimate: `cmd'")
+		`cmd'
+	}
+	else if ("`stage'"=="iv") {
+		* On the last stage, save list of all stored estimates
+		assert "`stored_estimates'"!=""
+		ereturn `hidden' local stored_estimates = "`stored_estimates'"
+	}
+} // lhs_endogvar
+} // stage
+
+* ATTACH - Add e(stats) and e(notes)
+	cap conf matrix reghdfe_statsmatrix
+	if (!c(rc)) local statsmatrix reghdfe_statsmatrix
+	Attach, notes(`notes') statsmatrix(`statsmatrix') summarize_quietly(`summarize_quietly') // Attach only once, not per stage
 end
 
 // -------------------------------------------------------------------------------------------------

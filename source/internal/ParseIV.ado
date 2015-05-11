@@ -2,7 +2,7 @@ capture program drop ParseIV
 program define ParseIV, sclass
 	syntax anything(id="varlist" name=0 equalok), [ ///
 		estimator(string) ivsuite(string) ///
-		savefirst first showraw vceunadjusted small ]
+		savefirst first showraw vceunadjusted small]
 
 	* Parses varlist: depvar indepvars [(endogvars = instruments)]
 		* depvar: dependent variable
@@ -132,4 +132,3 @@ program define ParseIV, sclass
 		sreturn local `key' ``key''
 	}
 end 
-

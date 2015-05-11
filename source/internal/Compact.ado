@@ -2,7 +2,7 @@ capture program drop Compact
 program define Compact, sclass
 syntax, basevars(string) verbose(integer) [depvar(string) indepvars(string) endogvars(string) instruments(string)] ///
 	[uid(string) timevar(string) panelvar(string) weightvar(string) absorb_keepvars(string) clustervars(string)] ///
-	[if(string) in(string) by(string) vceextra(string)]
+	[if(string) in(string) by(string) vceextra(string)] [savecache(integer 0)]
 
 * Drop unused variables
 	local exp "= `weightvar'"
@@ -20,16 +20,30 @@ syntax, basevars(string) verbose(integer) [depvar(string) indepvars(string) endo
 	foreach set of local sets {
 		local varlist ``set''
 		if ("`varlist'"=="") continue
-		local original_`set' `varlist'
+		// local original_`set' `varlist'
 		* the -if- prevents creating dummies for categories that have been excluded
-		ExpandFactorVariables `varlist' if `touse', setname(`set') verbose(`verbose')
+		ExpandFactorVariables `varlist' if `touse', setname(`set') verbose(`verbose') savecache(`savecache')
 		local `set' "`r(varlist)'"
 		local expandedvars `expandedvars' ``set''
 	}
 
+* Variables needed for savecache
+	if (`savecache') {
+		local cachevars `timevar' `panelvar'
+		foreach basevar of local basevars {
+			local in_expanded : list basevar in expandedvars
+			if (!`in_expanded') {
+				local cachevars `cachevars' `basevar'
+				char `basevar'[forbidden] 1
+			}
+		}
+		c_local cachevars `cachevars'
+		if ("`cachevars'"!="") Debug, level(0) msg("(cachevars: {res}`cachevars'{txt})")
+	}
+
 * Drop unused basevars and tsset vars (usually no longer needed)
 	if ("`vceextra'"!="") local tsvars `panelvar' `timevar' // We need to keep them only with autoco-robust VCE
-	keep `uid' `touse' `expandedvars' `weightvar' `absorb_keepvars' `cluster_keepvars' `tsvars' `by' 
+	keep `uid' `touse' `expandedvars' `weightvar' `absorb_keepvars' `cluster_keepvars' `tsvars' `by' `cachevars'
 
 * Drop excluded observations and observations with missing values
 	markout `touse' `expandedvars' `weightvar' `absorb_keepvars' `cluster_keepvars'

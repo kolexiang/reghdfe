@@ -1,5 +1,5 @@
-capture program drop Inner
-program define Inner, eclass
+capture program drop InnerUseCache
+program define InnerUseCache, eclass
 
 * INITIAL CLEANUP
 	ereturn clear // Clear previous results and drops e(sample)
@@ -9,8 +9,24 @@ program define Inner, eclass
 	assert `usecache'
 
 * Match "L.price" --> __L__price
-!!!TODO - BASE ON COMPACT?
-!!!Injects locals: depvar indepvars endogvars instruments expandedvars
+* Expand factor and time-series variables
+* (based on part of Compact.ado)
+	local expandedvars
+	local sets depvar indepvars endogvars instruments // depvar MUST be first
+	Debug, level(4) newline
+	Debug, level(4) msg("{title:Expanding factor and time-series variables:}")
+	foreach set of local sets {
+		local varlist ``set''
+		local `set' // empty
+		if ("`varlist'"=="") continue
+		fvunab factors : `varlist', name("error parsing `set'")
+		foreach factor of local factors {
+			mata: st_local("var", asarray(varlist_cache, "`factor'"))
+			Assert "`var'"!="", msg("couldn't find the match of {res}`factor'{error} in the cache (details: set=`set'; factors=`factors')")
+			local `set' ``set'' `var'
+		}
+		local expandedvars `expandedvars' ``set''
+	}
 
 * Replace vceoption with the correct cluster names (e.g. if it's a FE or a new variable)
 	if (`num_clusters'>0) {
@@ -19,16 +35,19 @@ program define Inner, eclass
 	}
 
 * PREPARE - Compute untransformed tss, R2 of eqn w/out FEs
-!!!TODO: HOW DO I GET THE TSS AND ETC
-	Prepare, weightexp(`weightexp') depvar(`depvar') stages(`stages') model(`model') expandedvars(`expandedvars') vcetype(`vcetype') endogvars(`endogvars')
-	* Injects tss, tss_`endogvar' (with stages), and r2c
+	mata: st_local("tss", strofreal(asarray(tss_cache, "`depvar'")))
+	Assert `tss'<., msg("tss of depvar `depvar' not found in cache")
+	foreach var of local endogvars {
+		mata: st_local("tss_`var'", strofreal(asarray(tss_cache, "`var'")))
+	}
+	local r2c = . // BUGBUG!!!
 
 * STAGES SETUP - Deal with different stages
 	assert "`stages'"!=""
 	if ("`stages'"!="none") {
 		Debug, level(1) msg(_n " {title:Stages to run}: " as result "`stages'" _n)
 		* Need to backup some locals
-		local backuplist preserve groupvar fast will_save_fe depvar indepvars endogvars instruments original_depvar tss
+		local backuplist groupvar fast will_save_fe depvar indepvars endogvars instruments original_depvar tss
 		foreach loc of local backuplist {
 			local backup_`loc' ``loc''
 		}
@@ -72,7 +91,6 @@ foreach lhs_endogvar of local lhs_endogvars {
 
 		if ("`stage'"!="iv") {
 			local fast 1
-			local preserve 0
 			local will_save_fe 0
 			local vcesuite avar
 			local endogvars
@@ -147,6 +165,7 @@ foreach lhs_endogvar of local lhs_endogvars {
 } // stage
 
 * ATTACH - Add e(stats) and e(notes)
-HOW DO I ATTACH? WHEN DO I DO IT?
-	// Attach, notes(`notes') statsmatrix(`statsmatrix') summarize_quietly(`summarize_quietly') // Attach only once, not per stage
+	cap conf matrix reghdfe_statsmatrix
+	if (!c(rc)) local statsmatrix reghdfe_statsmatrix
+	Attach, notes(`notes') statsmatrix(`statsmatrix') summarize_quietly(`summarize_quietly') // Attach only once, not per stage
 end

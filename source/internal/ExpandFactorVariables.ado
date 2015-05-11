@@ -8,12 +8,15 @@
 
 capture program drop ExpandFactorVariables
 program define ExpandFactorVariables, rclass
-syntax varlist(min=1 numeric fv ts) [if] [,setname(string)] [CACHE] verbose(integer)
+syntax varlist(min=1 numeric fv ts) [if] [,setname(string)] [SAVECACHE(integer 0)] verbose(integer)
 	
 	* If saving the data for later regressions -savecache(..)- we will need to match each expansion to its newvars
-	* This mata array is used for that
+	* The mata array is used for that
 	* Note: This explains why we need to wrap -fvrevar- in a loop
-	if ("`cache'"!="") mata: varlist_cache = asarray_create()
+	if (`savecache') {
+		mata: varlist_cache = asarray_create()
+		mata: asarray_notfound(varlist_cache, "")
+	}
 
 	local expanded_msg `"" - variable expansion for `setname': {res}`varlist'{txt} ->""'
 	while (1) {
@@ -24,15 +27,18 @@ syntax varlist(min=1 numeric fv ts) [if] [,setname(string)] [CACHE] verbose(inte
 		local contents
 		foreach var of varlist `r(varlist)' {
 			LabelRenameVariable `var' // Tempvars not renamed will be dropped automatically
-			if !r(is_dropped) local contents `contents' `r(varname)'
+			if !r(is_dropped) {
+				local contents `contents' `r(varname)'
+				// if (`savecache') di as error `"<mata: asarray(varlist_cache, "`factorvar'", "`r(varname)'")>"'
+				if (`savecache') mata: asarray(varlist_cache, "`factorvar'", "`r(varname)'")
+			}
 			* Yellow=Already existed, White=Created, Red=NotCreated (omitted or base)
 			local color = cond(r(is_dropped), "error", cond(r(is_newvar), "input", "result"))
 			if (`verbose'>3) {
 				local expanded_msg `"`expanded_msg' as `color' " `r(name)'" as text " (`r(varname)')""'
 			}
 		}
-		Assert "`contents'"!="", msg("error: variable -`fvvar'- in varlist -`varlist'- in category -`setname'- is  empty after factor/time expansion")
-		if ("`cache'"!="") mata: asarray(varlist_cache, "`fvvar'", "`contents'")
+		Assert "`contents'"!="", msg("error: variable -`factorvar'- in varlist -`varlist'- in category -`setname'- is  empty after factor/time expansion")
 		local newvarlist `newvarlist' `contents'
 	}
 

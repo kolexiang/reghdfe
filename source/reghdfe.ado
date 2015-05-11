@@ -32,6 +32,17 @@ program define reghdfe
 		exit
 	}
 
+* Intercept cleanup of cache (must be before replay)
+	cap syntax, CLEANupcache
+	if !c(rc) {
+		mata: mata drop HDFE_S // overwrites c(rc)
+		mata: mata drop varlist_cache
+		mata: mata drop tss_cache
+		global updated_clustervars
+		cap matrix drop reghdfe_statsmatrix
+		exit
+	}
+
 * Intercept replays
 	if replay() {
 		if (`"`e(cmd)'"'!="reghdfe") error 301
@@ -46,28 +57,20 @@ program define reghdfe
 		if (c(rc)) {
 			local rc = c(rc)
 			cap mata: mata drop HDFE_S // overwrites c(rc)
+			cap mata: mata drop varlist_cache
+			cap mata: mata drop tss_cache
 			global updated_clustervars
+			cap matrix drop reghdfe_statsmatrix
 			exit `rc'
 		}
+		exit
 	}
 
 * Intercept usecache
 	cap syntax anything(everything) [fw aw pw/], [*] USEcache
 	if !c(rc) {
-		cap noi InnerUseCache `0'
-		if (c(rc)) {
-			local rc = c(rc)
-			cap mata: mata drop HDFE_S // overwrites c(rc)
-			global updated_clustervars
-			exit `rc'
-		}
-	}
-
-* Intercept cleanup of cache
-	cap syntax anything(everything) [fw aw pw/], [*] CLEANupcache
-	if !c(rc) {
-		cap mata: mata drop HDFE_S // overwrites c(rc)
-		global updated_clustervars
+		InnerUseCache `0'
+		exit
 	}
 
 * Finally, call Inner
@@ -108,4 +111,5 @@ include "internal/Inner.ado"
 include "internal/Replay.ado"
 	include "internal/Header.ado"
 include "internal/InnerSaveCache.ado"
+include "internal/InnerUseCache.ado"
 // -------------------------------------------------------------------------------------------------
